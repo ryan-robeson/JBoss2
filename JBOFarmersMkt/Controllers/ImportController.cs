@@ -10,8 +10,6 @@ using System.IO;
 using CsvHelper;
 using System.Data;
 using System.Data.Entity.Validation;
-using PagedList;
-using PagedList.Mvc;
 using System.Data.Entity.Core;
 
 namespace JBOFarmersMkt.Controllers
@@ -29,139 +27,112 @@ namespace JBOFarmersMkt.Controllers
             return View();
         }
 
-        public ActionResult importProducts(int? page)
+        public ActionResult Products()
         {
             return View(context.Imports
-                .ToList().ToPagedList(page ?? 1,10));
+                .ToList());
         }
 
         [HttpPost]
-        public ActionResult importProducts(HttpPostedFileBase file)
+        public ActionResult Products(HttpPostedFileBase file)
         {
-            string path = null;
-
             List<Product> display = new List<Product>();
             JBOContext context = new JBOContext();
             try
             {
-                if (file.ContentLength > 0)
+                if (file != null && file.ContentLength > 0)
                 {
                     JBODatabase db = new JBODatabase();
 
-                    var fileName = Path.GetFileName(file.FileName);
-                    path = AppDomain.CurrentDomain.BaseDirectory + "upload\\" + fileName;
-                    file.SaveAs(path);
+                    StreamReader files = new StreamReader(file.InputStream);
+                    var csv = new CsvReader(files);
+                    csv.Configuration.RegisterClassMap<ProductClassMap>();
 
-                    //var checkFileName = context.Import.Where(i => i.filename == fileName);
+                    var productList = csv.GetRecords<ProductView>().ToList();
 
-                    var check = (from i in context.Imports where i.filename == fileName select i.filename).Count();
 
-                    if (check == 0)
+                    foreach (var s in productList)
                     {
+                        Product productDisplay = new Product();
 
-                        StreamReader files = new StreamReader(path);
-                        var csv = new CsvReader(files);
-                        csv.Configuration.RegisterClassMap<ProductClassMap>();
+                        productDisplay.productCode = int.Parse(s.productCode);
+                        productDisplay.description = s.description;
+                        productDisplay.department = s.department;
+                        productDisplay.category = s.category;
+                        productDisplay.upc = s.upc;
+                        productDisplay.storeCode = s.storeCode;
+                        productDisplay.unitPrice = decimal.Parse(s.unitPrice);
+                        productDisplay.discountable = Boolean.Parse(s.discountable);
+                        productDisplay.taxable = Boolean.Parse(s.taxable);
+                        productDisplay.inventoryMethod = s.inventoryMethod;
+                        productDisplay.quantity = double.Parse(s.quantity);
+                        productDisplay.orderTrigger = int.Parse(s.orderTrigger);
+                        productDisplay.recommendedOrder = int.Parse(s.recommendedOrder);
+                        productDisplay.lastSoldDate = s.lastSoldDate;
+                        productDisplay.supplier = s.supplier;
+                        productDisplay.liabilityItem = s.liabilityItem;
+                        productDisplay.LRT = s.LRT;
 
-                        var productList = csv.GetRecords<ProductView>().ToList();
+                        display.Add(productDisplay);
 
-
-                        foreach (var s in productList)
-                        {
-                            Product productDisplay = new Product();
-
-                            productDisplay.productCode = int.Parse(s.productCode);
-                            productDisplay.description = s.description;
-                            productDisplay.department = s.department;
-                            productDisplay.category = s.category;
-                            productDisplay.upc = s.upc;
-                            productDisplay.storeCode = s.storeCode;
-                            productDisplay.unitPrice = decimal.Parse(s.unitPrice);
-                            productDisplay.discountable = Boolean.Parse(s.discountable);
-                            productDisplay.taxable = Boolean.Parse(s.taxable);
-                            productDisplay.inventoryMethod = s.inventoryMethod;                           
-                            productDisplay.quantity = double.Parse(s.quantity);
-                            productDisplay.orderTrigger = int.Parse(s.orderTrigger);
-                            productDisplay.recommendedOrder = int.Parse(s.recommendedOrder);
-                            productDisplay.lastSoldDate = s.lastSoldDate;
-                            productDisplay.supplier = s.supplier;
-                            productDisplay.liabilityItem = s.liabilityItem;
-                            productDisplay.LRT = s.LRT;
-
-                            display.Add(productDisplay);
-
-                        }
-
-                        db.addImportedFile(fileName);
-                        List<Product> updated = new List<Product>();
-                        List<Product> newItems = new List<Product>();
-
-                        using (JBOContext ctx = new JBOContext())
-                        {
-                            var products = from p in context.Products select p.productCode;
-                            var update = from p in display where products.Contains(p.productCode) select p;
-                            var newItem = from p in display where !products.Contains(p.productCode) select p;
-                            foreach (var i in update)
-                            {
-                                updated.Add(i);
-                            }
-
-                            foreach (var i in newItem)
-                            {
-                                context.Products.Add(i);
-                                context.SaveChanges();
-                            }
-
-                        }
-
-                        using (JBOContext cont = new JBOContext())
-                        {
-                            foreach (Product i in updated)
-                            {
-                                Product prod = context.Products.Single(p => p.productCode == i.productCode);
-                                prod.productCode = i.productCode;
-                                prod.description = i.description;
-                                prod.department = i.department;
-                                prod.category = i.category;
-                                prod.upc = i.upc;
-                                prod.storeCode = i.storeCode;
-                                prod.unitPrice = i.unitPrice;
-                                prod.discountable = i.discountable;
-                                prod.taxable = i.taxable;
-                                prod.inventoryMethod = i.inventoryMethod;                                
-                                prod.quantity = i.quantity;
-                                prod.orderTrigger = i.orderTrigger;
-                                prod.recommendedOrder = i.recommendedOrder;
-                                prod.lastSoldDate = i.lastSoldDate;
-                                prod.supplier = i.supplier;
-                                prod.liabilityItem = i.liabilityItem;
-                                prod.LRT = i.LRT;
-                                try
-                                {
-                                    context.SaveChanges();
-                                }
-                                catch (EntityException ex)
-                                {
-
-                                }
-                            }
-
-                        }
                     }
 
+                    List<Product> updated = new List<Product>();
+                    List<Product> newItems = new List<Product>();
 
+                    using (JBOContext ctx = new JBOContext())
+                    {
+                        var products = from p in context.Products select p.productCode;
+                        var update = from p in display where products.Contains(p.productCode) select p;
+                        var newItem = from p in display where !products.Contains(p.productCode) select p;
+                        foreach (var i in update)
+                        {
+                            updated.Add(i);
+                        }
 
+                        foreach (var i in newItem)
+                        {
+                            context.Products.Add(i);
+                            context.SaveChanges();
+                        }
+
+                    }
+
+                    using (JBOContext cont = new JBOContext())
+                    {
+                        foreach (Product i in updated)
+                        {
+                            Product prod = context.Products.Single(p => p.productCode == i.productCode);
+                            prod.productCode = i.productCode;
+                            prod.description = i.description;
+                            prod.department = i.department;
+                            prod.category = i.category;
+                            prod.upc = i.upc;
+                            prod.storeCode = i.storeCode;
+                            prod.unitPrice = i.unitPrice;
+                            prod.discountable = i.discountable;
+                            prod.taxable = i.taxable;
+                            prod.inventoryMethod = i.inventoryMethod;
+                            prod.quantity = i.quantity;
+                            prod.orderTrigger = i.orderTrigger;
+                            prod.recommendedOrder = i.recommendedOrder;
+                            prod.lastSoldDate = i.lastSoldDate;
+                            prod.supplier = i.supplier;
+                            prod.liabilityItem = i.liabilityItem;
+                            prod.LRT = i.LRT;
+                            try
+                            {
+                                context.SaveChanges();
+                            }
+                            catch (EntityException ex)
+                            {
+
+                            }
+                        }
+
+                    }
                 }
-                else
-                {
-                    ViewBag.Error = TempData["error"] = "This File has already been imported!";
-                    ViewBag.Message = TempData["Message"] = "If you wish to re-upload this file, try deleting it first then retry.";
-                    return View();
-
-                }
-
             }
-
             catch (DbEntityValidationException e)
             {
                 foreach (var eve in e.EntityValidationErrors)
@@ -177,19 +148,17 @@ namespace JBOFarmersMkt.Controllers
                 throw;
             }
 
-            return RedirectToAction("../Product/index");
-
-
+            return RedirectToAction("Products");
         }
 
-        public ActionResult importSales(int? page)
+        public ActionResult Sales()
         {
             return View(context.Imports
-                .ToList().ToPagedList(page ?? 1, 10));
+                .ToList());
         }
 
         [HttpPost]
-        public ActionResult importSales(HttpPostedFileBase file)
+        public ActionResult Sales(HttpPostedFileBase file)
         {
             string path = null;
 
@@ -330,318 +299,318 @@ namespace JBOFarmersMkt.Controllers
                 throw;
             }
 
-            return RedirectToAction("../Product/index");
+            return RedirectToAction("Sales");
 
 
         }
 
-        public ActionResult importReturns(int? page)
-        {
-            return View(context.Imports
-                .ToList().ToPagedList(page ?? 1, 10));
-        }
+        //    public ActionResult importReturns(int? page)
+        //    {
+        //        return View(context.Imports
+        //            .ToList().ToPagedList(page ?? 1, 10));
+        //    }
 
-        [HttpPost]
-        public ActionResult importReturns(HttpPostedFileBase file)
-        {
-            string path = null;
+        //    [HttpPost]
+        //    public ActionResult importReturns(HttpPostedFileBase file)
+        //    {
+        //        string path = null;
 
-            List<Return> display = new List<Return>();
-            JBOContext context = new JBOContext();
-            try
-            {
-                if (file.ContentLength > 0)
-                {
-                    JBODatabase db = new JBODatabase();
+        //        List<Return> display = new List<Return>();
+        //        JBOContext context = new JBOContext();
+        //        try
+        //        {
+        //            if (file.ContentLength > 0)
+        //            {
+        //                JBODatabase db = new JBODatabase();
 
-                    var fileName = Path.GetFileName(file.FileName);
-                    path = AppDomain.CurrentDomain.BaseDirectory + "upload\\" + fileName;
-                    file.SaveAs(path);
+        //                var fileName = Path.GetFileName(file.FileName);
+        //                path = AppDomain.CurrentDomain.BaseDirectory + "upload\\" + fileName;
+        //                file.SaveAs(path);
 
-                    //var checkFileName = context.Import.Where(i => i.filename == fileName);
+        //                //var checkFileName = context.Import.Where(i => i.filename == fileName);
 
-                    var check = (from i in context.Imports where i.filename == fileName select i.filename).Count();
+        //                var check = (from i in context.Imports where i.filename == fileName select i.filename).Count();
 
-                    if (check == 0)
-                    {
+        //                if (check == 0)
+        //                {
 
-                        StreamReader files = new StreamReader(path);
-                        var csv = new CsvReader(files);
-                        csv.Configuration.RegisterClassMap<ReturnClassMap>();
+        //                    StreamReader files = new StreamReader(path);
+        //                    var csv = new CsvReader(files);
+        //                    csv.Configuration.RegisterClassMap<ReturnClassMap>();
 
-                        var productList = csv.GetRecords<ReturnView>().ToList();
-
-
-                        foreach (var s in productList)
-                        {
-                            Return returnDisplay = new Return();
-
-                            returnDisplay.returnId = int.Parse(s.returnId);
-                            returnDisplay.returnDate = DateTime.Parse(s.returnDate);
-                            returnDisplay.custId = int.Parse(s.custId);
-                            returnDisplay.description = s.description;
-                            returnDisplay.department = s.department;
-                            returnDisplay.category = s.category;
-                            returnDisplay.upc = s.upc;
-                            returnDisplay.storeCode = s.storeCode;
-                            returnDisplay.unitPrice = decimal.Parse(s.unitPrice);
-                            returnDisplay.quantity = double.Parse(s.quantity);
-                            returnDisplay.totalPrice = decimal.Parse(s.totalPrice);
-                            returnDisplay.discount = decimal.Parse(s.discount);
-                            returnDisplay.total = decimal.Parse(s.total);
-                            returnDisplay.cost = decimal.Parse(s.cost);
-                            returnDisplay.register = int.Parse(s.register);
-                            returnDisplay.supplier = s.supplier;
-
-                            display.Add(returnDisplay);
-
-                        }
-
-                        db.addImportedFile(fileName);
-                        List<Return> updated = new List<Return>();
-                        List<Return> newItems = new List<Return>();
-
-                        using (JBOContext ctx = new JBOContext())
-                        {
-                            var returns = from s in context.Returns select s.returnId;
-                            var update = from s in display where returns.Contains(s.returnId) select s;
-                            var newItem = from s in display where !returns.Contains(s.returnId) select s;
-                            foreach (var i in update)
-                            {
-                                updated.Add(i);
-                            }
-
-                            foreach (var i in newItem)
-                            {
-                                context.Returns.Add(i);
-                                context.SaveChanges();
-                            }
-
-                        }
-
-                        using (JBOContext cont = new JBOContext())
-                        {
-                            foreach (Return i in updated)
-                            {
-                                Return returns = context.Returns.Single(s => s.returnId == i.returnId);
-
-                                returns.returnId = i.returnId;
-                                returns.returnDate = i.returnDate;
-                                returns.custId = i.custId;
-                                returns.description = i.description;
-                                returns.department = i.department;
-                                returns.category = i.category;
-                                returns.upc = i.upc;
-                                returns.storeCode = i.storeCode;
-                                returns.unitPrice = i.unitPrice;
-                                returns.quantity = i.quantity;
-                                returns.totalPrice = i.totalPrice;
-                                returns.discount = i.discount;
-                                returns.total = i.total;
-                                returns.cost = i.cost;
-                                returns.register = i.register;
-                                returns.supplier = i.supplier;
-
-                                try
-                                {
-                                    context.SaveChanges();
-                                }
-                                catch (EntityException ex)
-                                {
-
-                                }
-                            }
-
-                        }
-                    }
+        //                    var productList = csv.GetRecords<ReturnView>().ToList();
 
 
+        //                    foreach (var s in productList)
+        //                    {
+        //                        Return returnDisplay = new Return();
 
-                }
-                else
-                {
-                    ViewBag.Error = TempData["error"] = "This File has already been imported!";
-                    ViewBag.Message = TempData["Message"] = "If you wish to re-upload this file, try deleting it first then retry.";
-                    return View();
+        //                        returnDisplay.returnId = int.Parse(s.returnId);
+        //                        returnDisplay.returnDate = DateTime.Parse(s.returnDate);
+        //                        returnDisplay.custId = int.Parse(s.custId);
+        //                        returnDisplay.description = s.description;
+        //                        returnDisplay.department = s.department;
+        //                        returnDisplay.category = s.category;
+        //                        returnDisplay.upc = s.upc;
+        //                        returnDisplay.storeCode = s.storeCode;
+        //                        returnDisplay.unitPrice = decimal.Parse(s.unitPrice);
+        //                        returnDisplay.quantity = double.Parse(s.quantity);
+        //                        returnDisplay.totalPrice = decimal.Parse(s.totalPrice);
+        //                        returnDisplay.discount = decimal.Parse(s.discount);
+        //                        returnDisplay.total = decimal.Parse(s.total);
+        //                        returnDisplay.cost = decimal.Parse(s.cost);
+        //                        returnDisplay.register = int.Parse(s.register);
+        //                        returnDisplay.supplier = s.supplier;
 
-                }
+        //                        display.Add(returnDisplay);
 
-            }
+        //                    }
 
-            catch (DbEntityValidationException e)
-            {
-                foreach (var eve in e.EntityValidationErrors)
-                {
-                    Console.WriteLine("Entity of type \"{0}\" in state \"{1}\" has the following validation errors:",
-                        eve.Entry.Entity.GetType().Name, eve.Entry.State);
-                    foreach (var ve in eve.ValidationErrors)
-                    {
-                        Console.WriteLine("- Property: \"{0}\", Error: \"{1}\"",
-                            ve.PropertyName, ve.ErrorMessage);
-                    }
-                }
-                throw;
-            }
+        //                    db.addImportedFile(fileName);
+        //                    List<Return> updated = new List<Return>();
+        //                    List<Return> newItems = new List<Return>();
 
-            return RedirectToAction("../Product/index");
+        //                    using (JBOContext ctx = new JBOContext())
+        //                    {
+        //                        var returns = from s in context.Returns select s.returnId;
+        //                        var update = from s in display where returns.Contains(s.returnId) select s;
+        //                        var newItem = from s in display where !returns.Contains(s.returnId) select s;
+        //                        foreach (var i in update)
+        //                        {
+        //                            updated.Add(i);
+        //                        }
 
+        //                        foreach (var i in newItem)
+        //                        {
+        //                            context.Returns.Add(i);
+        //                            context.SaveChanges();
+        //                        }
 
-        }
+        //                    }
 
-        public ActionResult importTransactions(int? page)
-        {
-            return View(context.Imports
-                .ToList().ToPagedList(page ?? 1, 10));
-        }
+        //                    using (JBOContext cont = new JBOContext())
+        //                    {
+        //                        foreach (Return i in updated)
+        //                        {
+        //                            Return returns = context.Returns.Single(s => s.returnId == i.returnId);
 
-        [HttpPost]
-        public ActionResult importTransactions(HttpPostedFileBase file)
-        {
-            string path = null;
+        //                            returns.returnId = i.returnId;
+        //                            returns.returnDate = i.returnDate;
+        //                            returns.custId = i.custId;
+        //                            returns.description = i.description;
+        //                            returns.department = i.department;
+        //                            returns.category = i.category;
+        //                            returns.upc = i.upc;
+        //                            returns.storeCode = i.storeCode;
+        //                            returns.unitPrice = i.unitPrice;
+        //                            returns.quantity = i.quantity;
+        //                            returns.totalPrice = i.totalPrice;
+        //                            returns.discount = i.discount;
+        //                            returns.total = i.total;
+        //                            returns.cost = i.cost;
+        //                            returns.register = i.register;
+        //                            returns.supplier = i.supplier;
 
-            List<Transaction> display = new List<Transaction>();
-            JBOContext context = new JBOContext();
-            try
-            {
-                if (file.ContentLength > 0)
-                {
-                    JBODatabase db = new JBODatabase();
+        //                            try
+        //                            {
+        //                                context.SaveChanges();
+        //                            }
+        //                            catch (EntityException ex)
+        //                            {
 
-                    var fileName = Path.GetFileName(file.FileName);
-                    path = AppDomain.CurrentDomain.BaseDirectory + "upload\\" + fileName;
-                    file.SaveAs(path);
+        //                            }
+        //                        }
 
-                    //var checkFileName = context.Import.Where(i => i.filename == fileName);
-
-                    var check = (from i in context.Imports where i.filename == fileName select i.filename).Count();
-
-                    if (check == 0)
-                    {
-
-                        StreamReader files = new StreamReader(path);
-                        var csv = new CsvReader(files);
-                        csv.Configuration.RegisterClassMap<TransactionClassMap>();
-
-                        var transactionList = csv.GetRecords<TransactionView>().ToList();
-
-
-                        foreach (var s in transactionList)
-                        {
-                            Transaction transactionDisplay = new Transaction();
-                            
-                            transactionDisplay.transactionCode = int.Parse(s.transactionCode);
-                            transactionDisplay.type = s.type;
-                            transactionDisplay.storeCode = s.storeCode;
-                            transactionDisplay.description = s.description;
-                            transactionDisplay.category = s.category;
-                            transactionDisplay.department = s.department;
-                            transactionDisplay.supplier = s.supplier;                            
-                            transactionDisplay.price = decimal.Parse(s.price);
-                            transactionDisplay.quantity = double.Parse(s.quantity);                            
-                            transactionDisplay.subtotal = decimal.Parse(s.subtotal);
-                            transactionDisplay.tax = decimal.Parse(s.tax);
-                            transactionDisplay.discount = decimal.Parse(s.discount);
-                            transactionDisplay.total = decimal.Parse(s.total);
-                            transactionDisplay.cashier = s.cashier;
-                            transactionDisplay.date = DateTime.Parse(s.date);
-                            transactionDisplay.register = s.register;
-                            
-
-                            display.Add(transactionDisplay);
-
-                        }
-
-                        db.addImportedFile(fileName);
-                        List<Transaction> updated = new List<Transaction>();
-                        List<Transaction> newItems = new List<Transaction>();
-
-                        using (JBOContext ctx = new JBOContext())
-                        {
-                            var transactions = from s in context.Transactions select s.transactionId;
-                            var update = from s in display where transactions.Contains(s.transactionId) select s;
-                            var newItem = from s in display where !transactions.Contains(s.transactionId) select s;
-                            foreach (var i in update)
-                            {
-                                updated.Add(i);
-                            }
-
-                            foreach (var i in newItem)
-                            {
-                                context.Transactions.Add(i);
-                                context.SaveChanges();
-                            }
-
-                        }
-
-                        using (JBOContext cont = new JBOContext())
-                        {
-                            foreach (Transaction i in updated)
-                            {
-                                Transaction transactions = context.Transactions.Single(s => s.transactionId == i.transactionId);
-
-                                transactions.transactionCode = i.transactionCode;
-                                transactions.type = i.type;
-                                transactions.storeCode = i.storeCode;
-                                transactions.description = i.description;
-                                transactions.category = i.category;
-                                transactions.department = i.department;
-                                transactions.supplier = i.supplier;                                
-                                transactions.price = i.price;
-                                transactions.quantity = i.quantity;
-                                
-                                transactions.subtotal = i.subtotal;
-                                transactions.tax = i.tax;
-                                transactions.discount = i.discount;
-                                transactions.total = i.total;
-                                transactions.cashier = i.cashier;
-                                transactions.date = i.date;
-                                transactions.register = i.register;
-
-                                try
-                                {
-                                    context.SaveChanges();
-                                }
-                                catch (EntityException ex)
-                                {
-
-                                }
-                            }
-
-                        }
-                    }
+        //                    }
+        //                }
 
 
 
-                }
-                else
-                {
-                    ViewBag.Error = TempData["error"] = "This File has already been imported!";
-                    ViewBag.Message = TempData["Message"] = "If you wish to re-upload this file, try deleting it first then retry.";
-                    return View();
+        //            }
+        //            else
+        //            {
+        //                ViewBag.Error = TempData["error"] = "This File has already been imported!";
+        //                ViewBag.Message = TempData["Message"] = "If you wish to re-upload this file, try deleting it first then retry.";
+        //                return View();
 
-                }
+        //            }
 
-            }
+        //        }
 
-            catch (DbEntityValidationException e)
-            {
-                foreach (var eve in e.EntityValidationErrors)
-                {
-                    Console.WriteLine("Entity of type \"{0}\" in state \"{1}\" has the following validation errors:",
-                        eve.Entry.Entity.GetType().Name, eve.Entry.State);
-                    foreach (var ve in eve.ValidationErrors)
-                    {
-                        Console.WriteLine("- Property: \"{0}\", Error: \"{1}\"",
-                            ve.PropertyName, ve.ErrorMessage);
-                    }
-                }
-                throw;
-            }
+        //        catch (DbEntityValidationException e)
+        //        {
+        //            foreach (var eve in e.EntityValidationErrors)
+        //            {
+        //                Console.WriteLine("Entity of type \"{0}\" in state \"{1}\" has the following validation errors:",
+        //                    eve.Entry.Entity.GetType().Name, eve.Entry.State);
+        //                foreach (var ve in eve.ValidationErrors)
+        //                {
+        //                    Console.WriteLine("- Property: \"{0}\", Error: \"{1}\"",
+        //                        ve.PropertyName, ve.ErrorMessage);
+        //                }
+        //            }
+        //            throw;
+        //        }
 
-            return RedirectToAction("../Product/index");
+        //        return RedirectToAction("../Product/index");
 
 
-        }
+        //    }
+
+        //    public ActionResult importTransactions(int? page)
+        //    {
+        //        return View(context.Imports
+        //            .ToList().ToPagedList(page ?? 1, 10));
+        //    }
+
+        //    [HttpPost]
+        //    public ActionResult importTransactions(HttpPostedFileBase file)
+        //    {
+        //        string path = null;
+
+        //        List<Transaction> display = new List<Transaction>();
+        //        JBOContext context = new JBOContext();
+        //        try
+        //        {
+        //            if (file.ContentLength > 0)
+        //            {
+        //                JBODatabase db = new JBODatabase();
+
+        //                var fileName = Path.GetFileName(file.FileName);
+        //                path = AppDomain.CurrentDomain.BaseDirectory + "upload\\" + fileName;
+        //                file.SaveAs(path);
+
+        //                //var checkFileName = context.Import.Where(i => i.filename == fileName);
+
+        //                var check = (from i in context.Imports where i.filename == fileName select i.filename).Count();
+
+        //                if (check == 0)
+        //                {
+
+        //                    StreamReader files = new StreamReader(path);
+        //                    var csv = new CsvReader(files);
+        //                    csv.Configuration.RegisterClassMap<TransactionClassMap>();
+
+        //                    var transactionList = csv.GetRecords<TransactionView>().ToList();
+
+
+        //                    foreach (var s in transactionList)
+        //                    {
+        //                        Transaction transactionDisplay = new Transaction();
+
+        //                        transactionDisplay.transactionCode = int.Parse(s.transactionCode);
+        //                        transactionDisplay.type = s.type;
+        //                        transactionDisplay.storeCode = s.storeCode;
+        //                        transactionDisplay.description = s.description;
+        //                        transactionDisplay.category = s.category;
+        //                        transactionDisplay.department = s.department;
+        //                        transactionDisplay.supplier = s.supplier;                            
+        //                        transactionDisplay.price = decimal.Parse(s.price);
+        //                        transactionDisplay.quantity = double.Parse(s.quantity);                            
+        //                        transactionDisplay.subtotal = decimal.Parse(s.subtotal);
+        //                        transactionDisplay.tax = decimal.Parse(s.tax);
+        //                        transactionDisplay.discount = decimal.Parse(s.discount);
+        //                        transactionDisplay.total = decimal.Parse(s.total);
+        //                        transactionDisplay.cashier = s.cashier;
+        //                        transactionDisplay.date = DateTime.Parse(s.date);
+        //                        transactionDisplay.register = s.register;
+
+
+        //                        display.Add(transactionDisplay);
+
+        //                    }
+
+        //                    db.addImportedFile(fileName);
+        //                    List<Transaction> updated = new List<Transaction>();
+        //                    List<Transaction> newItems = new List<Transaction>();
+
+        //                    using (JBOContext ctx = new JBOContext())
+        //                    {
+        //                        var transactions = from s in context.Transactions select s.transactionId;
+        //                        var update = from s in display where transactions.Contains(s.transactionId) select s;
+        //                        var newItem = from s in display where !transactions.Contains(s.transactionId) select s;
+        //                        foreach (var i in update)
+        //                        {
+        //                            updated.Add(i);
+        //                        }
+
+        //                        foreach (var i in newItem)
+        //                        {
+        //                            context.Transactions.Add(i);
+        //                            context.SaveChanges();
+        //                        }
+
+        //                    }
+
+        //                    using (JBOContext cont = new JBOContext())
+        //                    {
+        //                        foreach (Transaction i in updated)
+        //                        {
+        //                            Transaction transactions = context.Transactions.Single(s => s.transactionId == i.transactionId);
+
+        //                            transactions.transactionCode = i.transactionCode;
+        //                            transactions.type = i.type;
+        //                            transactions.storeCode = i.storeCode;
+        //                            transactions.description = i.description;
+        //                            transactions.category = i.category;
+        //                            transactions.department = i.department;
+        //                            transactions.supplier = i.supplier;                                
+        //                            transactions.price = i.price;
+        //                            transactions.quantity = i.quantity;
+
+        //                            transactions.subtotal = i.subtotal;
+        //                            transactions.tax = i.tax;
+        //                            transactions.discount = i.discount;
+        //                            transactions.total = i.total;
+        //                            transactions.cashier = i.cashier;
+        //                            transactions.date = i.date;
+        //                            transactions.register = i.register;
+
+        //                            try
+        //                            {
+        //                                context.SaveChanges();
+        //                            }
+        //                            catch (EntityException ex)
+        //                            {
+
+        //                            }
+        //                        }
+
+        //                    }
+        //                }
+
+
+
+        //            }
+        //            else
+        //            {
+        //                ViewBag.Error = TempData["error"] = "This File has already been imported!";
+        //                ViewBag.Message = TempData["Message"] = "If you wish to re-upload this file, try deleting it first then retry.";
+        //                return View();
+
+        //            }
+
+        //        }
+
+        //        catch (DbEntityValidationException e)
+        //        {
+        //            foreach (var eve in e.EntityValidationErrors)
+        //            {
+        //                Console.WriteLine("Entity of type \"{0}\" in state \"{1}\" has the following validation errors:",
+        //                    eve.Entry.Entity.GetType().Name, eve.Entry.State);
+        //                foreach (var ve in eve.ValidationErrors)
+        //                {
+        //                    Console.WriteLine("- Property: \"{0}\", Error: \"{1}\"",
+        //                        ve.PropertyName, ve.ErrorMessage);
+        //                }
+        //            }
+        //            throw;
+        //        }
+
+        //        return RedirectToAction("../Product/index");
+
+
+        //    }
 
     }
 }
