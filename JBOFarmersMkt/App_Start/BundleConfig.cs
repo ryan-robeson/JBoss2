@@ -27,6 +27,10 @@ namespace JBOFarmersMkt
             bundles.Add(new ScriptBundle("~/bundles/bootstrapjs").Include(
                 "~/Scripts/bootstrap.js"));
 
+            bundles.Add(new ScriptBundle("~/bundles/utilities").Include(
+                "~/Scripts/papaparse.js",
+                "~/Scripts/lodash.js"));
+
             bundles.Add(new StyleBundle("~/Content/bootstrapcss").Include(
                 "~/Content/bootstrap.css",
                 "~/Content/bootstrap-theme.css"));

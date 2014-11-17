@@ -1,0 +1,269 @@
+﻿@using JBOFarmersMkt.Models;
+@{
+    ViewBag.Title = "Import";
+}
+<!-- This should probably moved to a site stylesheet -->
+<style>
+    input[type=file] {
+        border: none;
+    }
+</style>
+<section class="import">
+    <div class="row">
+        <header class="col-xs-12 page-header">
+            <h1>@ViewBag.Title</h1>
+        </header>
+    </div>
+    <div class="row">
+        <div class="col-xs-12">
+            <!-- Display AJAX messages -->
+            <div id="errors" style="display:none;" class="alert alert-danger"></div>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-sm-12">
+            @using (Html.BeginForm(null, null, FormMethod.Post, new { enctype = "multipart/form-data", @class = "form-horizontal", role = "form" }))
+            {
+                @Html.AntiForgeryToken()
+                @Html.ValidationSummary(true)
+
+                <div class="form-group">
+                    <label class="col-sm-4 control-label" for="products">Products</label>
+                    <div class="col-sm-4">
+                        <input class="form-control" type="file" name="products" id="products" />
+                        <p class="help-block"><em>Reports & Exports > Exports > Stock Items</em></p>
+                        <div id="products-error" style="display:none;" class="help-block"></div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="col-sm-4 control-label" for="sales">Sales</label>
+                    <div class="col-sm-4">
+                        <input class="form-control" type="file" name="sales" id="sales" />
+                        <p class="help-block"><em>Reports & Exports > Exports > Export Sales</em></p>
+                        <div id="sales-error" style="display:none;" class="help-block"></div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <div class="col-sm-4 col-sm-offset-4">
+                        <input class="btn btn-primary" type="submit" value="Confirm" disabled="disabled" />
+                    </div>
+                </div>
+
+            }
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-xs-12">
+            <h1>Preview <small>Please note that this information has not yet been processed or saved.</small></h1>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-xs-12">
+            <h2>Products</h2>
+            <div id="product-preview">
+                <p>Choose a product csv file above.</p>
+            </div>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-xs-12">
+            <h2>Sales</h2>
+            <div id="sales-preview">
+                <p>Choose a sales csv file above.</p>
+            </div>
+        </div>
+    </div>
+</section>
+<script type="text/template" id="table-template">
+    <% var d = new Date(file.lastModified) %>
+
+    <p><%- file.name %> - Last Modified at <%- d.toLocaleTimeString() %> on <%- d.toLocaleDateString() %></p>
+
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <% _.forEach(_.first(rows), function(header_name) { %>
+                    <th><%- header_name %></th>
+                    <% }); %>
+                </tr>
+            </thead>
+            <tbody>
+                <% _.forEach(_.rest(rows), function(row) { %>
+                <tr>
+                    <% _.forEach(row, function(value) { %>
+                    <td>
+                        <%- value %>
+                    </td>
+                    <% }); %>
+                </tr>
+                <% }); %>
+            </tbody>
+        </table>
+    </div>
+</script>
+
+<script type="text/template" id="error-template">
+    <p>Error: <%- name %></p>
+    <ul>
+        <% _.forEach(reason, function(r) { %>
+        <li><%- r %></li>
+        <% }); %>
+    </ul>
+</script>
+
+@section scripts {
+    <script type="text/javascript">
+        // Acts as a backup of the original html of the given element and returns
+        // a function that will restore it when called.
+        var reset_text_to_default = function (elem) {
+            var html = $(elem).html();
+
+            return function () {
+                $(elem).html(html);
+            };
+        };
+
+        var input_has_error = function (error_element, name, reason, template) {
+            $(error_element).html(template({ name: name, reason: reason }))
+            .show()
+            .closest(".form-group")
+            .removeClass("has-success")
+            .addClass("has-error");
+        };
+
+        var input_has_success = function (error_element) {
+            $(error_element).hide()
+            .closest(".form-group")
+            .removeClass("has-error")
+            .addClass("has-success");
+        };
+
+        var display_preview = function (preview_element, template, dt_config) {
+            return function (data, f) {
+                $(preview_element).html(template({ rows: data, file: f })).find("table").dataTable(dt_config);
+            };
+        };
+
+        var check_form = function () {
+            if ($("form").has(".has-error").length > 0) {
+                $("form input[type='submit']").prop("disabled", true);
+            } else {
+                $("form input[type='submit']").prop("disabled", false);
+            }
+        };
+
+        // Takes a regex specifying a valid filename.
+        // Returns a function that takes a file and compares its name to the regex
+        // returning true or false as appropriate.
+        var is_valid_filename = function (regex) {
+            return function (file) {
+                if (!file.name.match(regex)) {
+                    return false;
+                }
+
+                return true;
+            }
+        }
+
+        var is_valid_product_filename = is_valid_filename(/stock_items.+csv$/);
+        var is_valid_sales_filename = is_valid_filename(/sales_from_.+_to_.+csv$/);
+
+        // Generic function for parsing the given file input when it changes. Takes care of adding the event handler, data validation, and error handling.
+        var parse_file_on_change = function (file_input, error_element, error_template, resetFn, is_valid_filenameFn, displayFn) {
+            var handle_error = function (name, reason) {
+                input_has_error(error_element, name, reason, error_template);
+                resetFn();
+                check_form();
+            };
+
+            $(file_input).change(function () {
+                var parse_results = $(this).parse({
+                    config: {
+                        error: function (error, file) {
+                            console.log("An error occurred with the chosen file: ", error);
+                            handle_error(error.name, error.message);
+                        },
+                        complete: function (results, file) {
+                            console.log(results);
+                            input_has_success(error_element);
+                            displayFn(results.data, file);
+                            check_form();
+                        }
+                    },
+                    before: function (file, input_element) {
+                        // Make sure the file checks out before parsing and allowing the user to upload it.
+                        a = { action: "continue" };
+                        r = [];
+
+                        if (!file.name.match(/.csv$/)) {
+                            // The file must be a CSV. Abort parsing.
+                            a = { action: "abort" };
+                            r.push("Unsupported file selected. Only CSV files exported from ShopKeep are supported.");
+                        }
+
+                        if (!is_valid_filenameFn(file)) {
+                            // The filename does not match that of ShopKeep exports.
+                            a = { action: "abort" };
+                            r.push("Wrong file selected. The name of the selected file is not consistent with filenames used by ShopKeep.");
+                        }
+
+                        a.reason = r;
+
+                        return a;
+                    },
+                    // Called when there is an error parsing files
+                    error: function (error, file, input_element, reason) {
+                        console.log("Error: ", error, " - ", reason);
+                        handle_error(error.name, reason);
+                    }
+                });
+            });
+        };
+
+        $(function () {
+            var table_template = _.template($("#table-template").html());
+            var error_template = _.template($("#error-template").html());
+
+            var reset_product_preview = reset_text_to_default("#product-preview");
+            var reset_sales_preview = reset_text_to_default("#sales-preview");
+
+            var display_products = display_preview("#product-preview", table_template,
+                {
+                    "order": [1, "asc"],
+                    "searching": false,
+                    "lengthChange": false,
+                    "columnDefs": [
+                        {
+                            "targets": [3, 7, 8, 9, 11, 13, 14, 15, 17, 18, 19],
+                            "visible": false
+                        },
+                        {
+                            "targets": "_all",
+                            "orderable": false
+                        }
+                    ]
+                });
+
+            var display_sales = display_preview("#sales-preview", table_template,
+                {
+                    "order": [1, "asc"],
+                    "searching": false,
+                    "lengthChange": false,
+                    "columnDefs": [
+                        {
+                            "targets": [3, 5, 6, 7, 8, 10, 14, 16],
+                            "visible": false
+                        },
+                        {
+                            "targets": "_all",
+                            "orderable": false
+                        }
+                    ]
+                });
+
+            parse_file_on_change("input[type='file']#products", "#products-error", error_template, reset_product_preview, is_valid_product_filename, display_products);
+            parse_file_on_change("input[type='file']#sales", "#sales-error", error_template, reset_sales_preview, is_valid_sales_filename, display_sales);
+        });
+    </script>
+}
