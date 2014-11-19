@@ -30,9 +30,12 @@
                 <div class="form-group">
                     <label class="col-sm-4 control-label" for="products">Products</label>
                     <div class="col-sm-4">
-                        <input class="form-control" type="file" name="products" id="products" accept=".csv, text/csv"/>
+                        <input class="form-control" type="file" name="products" id="products" accept=".csv, text/csv" />
                         <p class="help-block"><em>Reports & Exports > Exports > Stock Items</em></p>
-                        <div id="products-error" style="display:none;" class="help-block"></div>
+                        <div id="products-error" class="error-message help-block" style="display:none;"></div>
+                    </div>
+                    <div class="col-sm-4">
+                        <p class="form-control-static"><a href="#" id="reset-products-input">Reset</a></p>
                     </div>
                 </div>
                 <div class="form-group">
@@ -40,7 +43,10 @@
                     <div class="col-sm-4">
                         <input class="form-control" type="file" name="sales" id="sales" accept=".csv, text/csv" />
                         <p class="help-block"><em>Reports & Exports > Exports > Export Sales</em></p>
-                        <div id="sales-error" style="display:none;" class="help-block"></div>
+                        <div id="sales-error" class="error-message help-block" style="display:none;"></div>
+                    </div>
+                    <div class="col-sm-4">
+                        <p class="form-control-static"><a href="#" id="reset-sales-input">Reset</a></p>
                     </div>
                 </div>
                 <div class="form-group">
@@ -145,12 +151,48 @@
             };
         };
 
+        // Disable form submission if there are any errors
+        // or if the form is empty.
         var check_form = function () {
-            if ($("form").has(".has-error").length > 0) {
-                $("form input[type='submit']").prop("disabled", true);
+            // Default to disabled
+            var disabled = true;
+
+            // Check if both inputs are empty
+            // See: http://stackoverflow.com/a/17044272
+            var isEmpty = $("input[type=file]").filter(function () { return !this.value }).length == 2;
+
+            var hasErrors = $("form").has(".has-error").length > 0;
+
+            if (isEmpty || hasErrors) {
+                disabled = true;
             } else {
-                $("form input[type='submit']").prop("disabled", false);
+                disabled = false;
             }
+
+            $("form input[type='submit']").prop("disabled", disabled);
+        };
+
+        // Reset the given file input using the workaround found
+        // at: http://stackoverflow.com/a/13351234
+        // resetPreviewFn() should clear the preview area for the particular file
+        var reset_file_input = function (elem, resetPreviewFn) {
+            // Perform the workaround to reset the file input
+            var e = $(elem);
+            e.wrap('<form>').closest('form').get(0).reset();
+            e.unwrap();
+
+            // Remove any error or success classes since the file is no longer selected
+            // Also hide any error messages that may exist
+            e.closest('.form-group')
+                .removeClass('has-error has-success')
+                .find('.error-message')
+                .hide();
+
+            // The form could now be valid. Check it.
+            check_form();
+
+            // Reset the preview area since a file is no longer selected.
+            resetPreviewFn();
         };
 
         // Takes a regex specifying a valid filename.
@@ -261,6 +303,9 @@
                         }
                     ]
                 });
+
+            $("#reset-products-input").click(function (e) { e.preventDefault(); reset_file_input("#products", reset_product_preview) });
+            $("#reset-sales-input").click(function (e) { e.preventDefault(); reset_file_input("#sales", reset_sales_preview) });
 
             parse_file_on_change("input[type='file']#products", "#products-error", error_template, reset_product_preview, is_valid_product_filename, display_products);
             parse_file_on_change("input[type='file']#sales", "#sales-error", error_template, reset_sales_preview, is_valid_sales_filename, display_sales);
