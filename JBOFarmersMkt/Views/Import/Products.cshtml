@@ -81,7 +81,7 @@
     </div>
 </section>
 <script type="text/template" id="table-template">
-    <% var d = new Date(file.lastModified) %>
+    <% var d = new Date(file.lastModifiedDate) %>
 
     <p><%- file.name %> - Last Modified at <%- d.toLocaleTimeString() %> on <%- d.toLocaleDateString() %></p>
 
