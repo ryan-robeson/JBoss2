@@ -23,11 +23,8 @@ namespace JBOFarmersMkt.Controllers
 
         public ActionResult Index()
         {
-            return View();
-        }
-
-        public ActionResult Products()
-        {
+            // Change this to return lastModifiedDate for product and sales
+            // to save a round trip from the client later
             return View(context.Imports
                 .ToList());
         }
@@ -41,7 +38,7 @@ namespace JBOFarmersMkt.Controllers
             {
                 if (file != null && file.ContentLength > 0)
                 {
-                    JBODatabase db = new JBODatabase();
+                    //JBODatabase db = new JBODatabase();
 
                     StreamReader files = new StreamReader(file.InputStream);
                     var csv = new CsvReader(files);

@@ -484,7 +484,7 @@
     <Content Include="Views\Supplier\Create.cshtml" />
     <Content Include="Views\Supplier\Edit.cshtml" />
     <Content Include="Views\Supplier\Delete.cshtml" />
-    <Content Include="Views\Import\Products.cshtml" />
+    <Content Include="Views\Import\Index.cshtml" />
     <Content Include="Views\Supplier\addUser.cshtml" />
     <Content Include="Views\Supplier\Users.cshtml" />
     <Content Include="Views\Supplier\addAssignment.cshtml" />
