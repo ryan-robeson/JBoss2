@@ -163,39 +163,4 @@ namespace JBOFarmersMkt.ViewModels
             return count < _fieldNames.Length;
         }
     }
-
-
-
-    //public class MustBeNewerThanLastImportOf : ValidationAttribute
-    //{
-    //    private readonly ImportCategories _type;
-
-    //    public MustBeNewerThanLastImportOf(ImportCategories type)
-    //        : base("{0} file must be newer than {1}")
-    //    {
-    //        _type = type;
-    //    }
-
-    //    protected override ValidationResult IsValid(object value, ValidationContext validationContext)
-    //    {
-    //        HttpPostedFileBase file = value as HttpPostedFileBase;
-    //        DateTime lastImport;
-
-    //        if (value != null && _type != null)
-    //        {
-    //            using (var context = new JBOContext())
-    //            {
-    //                context.Database.Log = s => System.Diagnostics.Debug.WriteLine(s); // For checking efficiency
-
-    //                lastImport = context.Imports.Last(i => i.type == _type).LastModifiedAt;
-    //            }
-    //            if (lastImport != null && lastImport > DateTime.Parse(file)
-    //            {
-    //                var errorMessage = FormatErrorMessage(validationContext.DisplayName);
-    //                return new ValidationResult(errorMessage);
-    //            }
-    //        }
-    //        return ValidationResult.Success;
-    //    }
-    //}
 }
