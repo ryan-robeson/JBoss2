@@ -1,4 +1,6 @@
 ﻿@using JBOFarmersMkt.Models;
+@model JBOFarmersMkt.ViewModels.ImportViewModel
+
 @{
     ViewBag.Title = "Import";
 }
@@ -22,7 +24,7 @@
     </div>
     <div class="row">
         <div class="col-sm-12">
-            @using (Html.BeginForm(null, null, FormMethod.Post, new { enctype = "multipart/form-data", @class = "form-horizontal", role = "form" }))
+            @using (Html.BeginForm(null, null, FormMethod.Post, new { enctype = "multipart/form-data", id = "import", @class = "form-horizontal", role = "form" }))
             {
                 @Html.AntiForgeryToken()
                 @Html.ValidationSummary(true)
@@ -116,6 +118,14 @@
         <li><%- r %></li>
         <% }); %>
     </ul>
+</script>
+
+<script type="application/json" id="import-metadata">
+    {
+    "hashes": @Html.Raw(@Json.Encode(@ViewBag.hashes)),
+    "lastProductsImportDate": @Html.Raw(@Json.Encode(@ViewBag.lastProductsImportDate)),
+    "lastSalesImportDate": @Html.Raw(@Json.Encode(@ViewBag.lastSalesImportDate))
+    }
 </script>
 
 @section scripts {

@@ -90,54 +90,162 @@
     var is_valid_product_filename = is_valid_filename(/stock_items.+csv$/);
     var is_valid_sales_filename = is_valid_filename(/sales_from_.+_to_.+csv$/);
 
+    // Return the base64 encoded sha256 hash corresponding to string.
+    // See: https://github.com/digitalbazaar/forge#sha256
+    var compute_hash = function (string) {
+        var md = forge.md.sha256.create();
+        md.update(string);
+        return forge.util.encode64(md.digest().data);
+    }
+
+    // Hashes the given file. Returns a promise that will contain the hash or an error.
+    var hash_file = function (f) {
+        var reader = new FileReader();
+        var deferred = $.Deferred();
+
+        reader.onload = function (e) {
+            var result = compute_hash(e.target.result)
+            deferred.resolve(result);
+        }
+
+        reader.onerror = function () {
+            deferred.reject(this);
+        }
+
+        // Setting to ASCII could be a source of problems, but it seems to be agreeing
+        // with the server so far.
+        reader.readAsText(f, "ASCII");
+
+        return deferred.promise();
+    }
+
+    // Calls hash_file with the file in file_input
+    var hash_file_input = function (file_input) {
+        return hash_file($(file_input)[0].files[0]);
+    }
+
+    // Takes the last import date for the particular import
+    // and returns a function that takes the files lastModifiedDate.
+    // This function returns true if the file is newer than the last import.
+    var is_valid_date = function (lastImportDate) {
+        return function (fileDate) {
+            return fileDate > lastImportDate;
+        }
+    }
+
     // Generic function for parsing the given file input when it changes. Takes care of adding the event handler, data validation, and error handling.
-    var parse_file_on_change = function (file_input, error_element, error_template, resetFn, is_valid_filenameFn, displayFn) {
+    var parse_file_on_change = function (file_input, error_element, error_template, resetFn, is_valid_filenameFn, is_valid_dateFn, displayFn, import_metadata) {
         var handle_error = function (name, reason) {
             input_has_error(error_element, name, reason, error_template);
             resetFn();
             check_form();
         };
 
+        // Validates the current file input.
+        // Returns a promise that will contain the name and reasons
+        // on failure to be used with handle_error().
+        // Doesn't return any useful data on succcess.
+        var validate = function () {
+            var errors = [];
+            var file = $(file_input)[0].files[0];
+            var deferred = $.Deferred();
+
+            if (!file.name.match(/.csv$/)) {
+                // The file must be a CSV.
+                errors.push("Unsupported file selected. Only CSV files exported from ShopKeep are supported.");
+            }
+
+            if (!is_valid_filenameFn(file)) {
+                // The filename does not match that of ShopKeep exports.
+                errors.push("Wrong file selected. The name of the selected file is not consistent with filenames used by ShopKeep.");
+            }
+
+            if (errors.length > 0) {
+                // We don't have a valid csv.
+                // Don't waste time computing a hash or checking modification time.
+                deferred.reject("Invalid filename.", errors);
+            } else {
+                // The csv seems legit.
+                // Check the modification time before hashing
+               
+                // Check the hash before parsing.
+                var file_is_unique = hash_file(file)
+                    .then(function (hash) {
+                        console.log(hash);
+                        // Return a new promise so this can be chained with other validations.
+                        return $.Deferred(function (d) {
+                            if (_.contains(import_metadata.hashes, hash)) {
+                                // The file is a duplicate
+                                errors.push("This file has already been imported.");
+                                d.reject("Duplicate file")
+                            } else {
+                                // The file is legit.
+                                d.resolve();
+                            }
+                        }).promise();
+                    }, function (error) {
+                        // Something happened reading the file.
+                        // Let the server worry about the duplicate check.
+                        return $.Deferred().resolve().promise();
+                    });
+
+                file_is_unique.then(function () {
+                    // All validations passed.
+                    deferred.resolve();
+                }, function (name) {
+                    // There was a problem.
+                    deferred.reject(name, errors);
+                });
+            }
+
+            return deferred.promise();
+        }
+
         $(file_input).change(function () {
-            var parse_results = $(this).parse({
-                config: {
-                    error: function (error, file) {
-                        console.log("An error occurred with the chosen file: ", error);
-                        handle_error(error.name, error.message);
+            validate().then(function () {
+                // This file has passed validation.
+                input_has_success(error_element);
+
+                $(file_input).parse({
+                    config: {
+                        error: function (error, file) {
+                            console.log("An error occurred with the chosen file: ", error);
+                            handle_error(error.name, error.message);
+                        },
+                        complete: function (results, file) {
+                            console.log(results);
+                            displayFn(results.data, file);
+                            check_form();
+                        }
                     },
-                    complete: function (results, file) {
-                        console.log(results);
-                        input_has_success(error_element);
-                        displayFn(results.data, file);
-                        check_form();
+                    //#region Unused beforeFn
+                    //before: function (file, input_element) {
+                    //    // This function is called before the file is parsed
+                    //    // and can be used to abort parsing. Most validation
+                    //    // should now be occurring in validate(), however.
+                    //    var a = { action: "continue" };
+                    //    var r = [];
+
+                    //    // If there are any reasons to abort, we should be aborting...
+                    //    if (r.length > 0) {
+                    //        a = { action: "abort" };
+                    //    }
+
+                    //    a.reason = r;
+
+                    //    return a;
+                    //},
+                    //#endregion
+
+                    // Called when there is an error parsing files
+                    error: function (error, file, input_element, reason) {
+                        console.log("Error: ", error, " - ", reason);
+                        handle_error(error.name, reason);
                     }
-                },
-                before: function (file, input_element) {
-                    // Make sure the file checks out before parsing and allowing the user to upload it.
-                    a = { action: "continue" };
-                    r = [];
-
-                    if (!file.name.match(/.csv$/)) {
-                        // The file must be a CSV. Abort parsing.
-                        a = { action: "abort" };
-                        r.push("Unsupported file selected. Only CSV files exported from ShopKeep are supported.");
-                    }
-
-                    if (!is_valid_filenameFn(file)) {
-                        // The filename does not match that of ShopKeep exports.
-                        a = { action: "abort" };
-                        r.push("Wrong file selected. The name of the selected file is not consistent with filenames used by ShopKeep.");
-                    }
-
-                    a.reason = r;
-
-                    return a;
-                },
-                // Called when there is an error parsing files
-                error: function (error, file, input_element, reason) {
-                    console.log("Error: ", error, " - ", reason);
-                    handle_error(error.name, reason);
-                }
+                })
+            }, function (name, errors) {
+                //This file failed validation.
+                handle_error(name, errors);
             });
         });
     };
@@ -148,6 +256,10 @@
 
         var reset_product_preview = reset_text_to_default("#product-preview");
         var reset_sales_preview = reset_text_to_default("#sales-preview");
+
+        var import_metadata = $.parseJSON($("#import-metadata").text()) || {};
+        var is_valid_product_date = is_valid_date(new Date(import_metadata.lastProductsImportDate));
+        var is_valid_sales_date = is_valid_date(new Date(import_metadata.lastSalesImportDate))
 
         var display_products = display_preview("#product-preview", table_template,
             {
@@ -186,7 +298,45 @@
         $("#reset-products-input").click(function (e) { e.preventDefault(); reset_file_input("#products", reset_product_preview) });
         $("#reset-sales-input").click(function (e) { e.preventDefault(); reset_file_input("#sales", reset_sales_preview) });
 
-        parse_file_on_change("input[type='file']#products", "#products-error", error_template, reset_product_preview, is_valid_product_filename, display_products);
-        parse_file_on_change("input[type='file']#sales", "#sales-error", error_template, reset_sales_preview, is_valid_sales_filename, display_sales);
+        // Parse products file input on change
+        parse_file_on_change(
+            "input[type='file']#products",
+            "#products-error",
+            error_template,
+            reset_product_preview,
+            is_valid_product_filename,
+            is_valid_product_date,
+            display_products,
+            import_metadata
+            );
+
+        // Parse sales file input on change
+        parse_file_on_change(
+            "input[type='file']#sales",
+            "#sales-error",
+            error_template,
+            reset_sales_preview,
+            is_valid_sales_filename,
+            is_valid_sales_date,
+            display_sales,
+            import_metadata
+            );
+
+        // Handle form submission
+        $("form#import").submit(function (e) {
+            e.preventDefault();
+
+            var formData = new FormData(this);
+
+            $.ajax({
+                url: '/Import/Products',
+                type: 'POST',
+                data: formData,
+                contentType: false,
+                processData: false
+            }).done(function (data) {
+                console.log(data);
+            });
+        });
     });
 })(jQuery, _);

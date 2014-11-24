@@ -10,6 +10,7 @@ using CsvHelper;
 using System.Data;
 using System.Data.Entity.Validation;
 using System.Data.Entity.Core;
+using JBOFarmersMkt.ViewModels;
 
 namespace JBOFarmersMkt.Controllers
 {
@@ -25,126 +26,179 @@ namespace JBOFarmersMkt.Controllers
         {
             // Change this to return lastModifiedDate for product and sales
             // to save a round trip from the client later
-            return View(context.Imports
-                .ToList());
+            //return View(context.Imports
+            //    .ToList());
+
+            // Get last 5 product hashes
+            var productHashes = context.Imports
+                .Where(i => i.type == ImportCategories.Products)
+                .OrderByDescending(i => i.CreatedAt)
+                .Take(5)
+                .Select(i => i.contentHash);
+
+            // Get the last 5 sales hashes
+            var salesHashes = context.Imports
+                .Where(i => i.type == ImportCategories.Sales)
+                .OrderByDescending(i => i.CreatedAt)
+                .Take(5)
+                .Select(i => i.contentHash);
+
+            // Get the date of the most recent products import
+            var lastProductsImportDate = context.Imports
+                .Where(i => i.type == ImportCategories.Products)
+                .OrderByDescending(i => i.CreatedAt)
+                .Select(i => i.CreatedAt)
+                .DefaultIfEmpty()
+                .First();
+
+            // Get the date of the most recent sales import
+            var lastSalesImportDate = context.Imports
+                .Where(i => i.type == ImportCategories.Sales)
+                .OrderByDescending(i => i.CreatedAt)
+                .Select(i => i.CreatedAt)
+                .DefaultIfEmpty()
+                .First();
+
+            // Send this data to the view for client-side validations
+            ViewBag.hashes = productHashes.Concat(salesHashes).ToArray();
+            ViewBag.lastProductsImportDate = lastProductsImportDate.ToString("s");
+            ViewBag.lastSalesImportDate = lastSalesImportDate.ToString("s");
+
+            return View(new ImportViewModel());
         }
 
         [HttpPost]
-        public ActionResult Products(HttpPostedFileBase file)
+        public ActionResult Products(ImportViewModel model)
         {
-            List<Product> display = new List<Product>();
-            JBOContext context = new JBOContext();
-            try
+            if (ModelState.IsValid)
             {
-                if (file != null && file.ContentLength > 0)
-                {
-                    //JBODatabase db = new JBODatabase();
-
-                    StreamReader files = new StreamReader(file.InputStream);
-                    var csv = new CsvReader(files);
-                    csv.Configuration.RegisterClassMap<ProductClassMap>();
-
-                    var productList = csv.GetRecords<ProductView>().ToList();
-
-
-                    foreach (var s in productList)
+                return Json(new
                     {
-                        Product productDisplay = new Product();
-
-                        productDisplay.productCode = int.Parse(s.productCode);
-                        productDisplay.description = s.description;
-                        productDisplay.department = s.department;
-                        productDisplay.category = s.category;
-                        productDisplay.upc = s.upc;
-                        productDisplay.storeCode = s.storeCode;
-                        productDisplay.unitPrice = decimal.Parse(s.unitPrice);
-                        productDisplay.discountable = Boolean.Parse(s.discountable);
-                        productDisplay.taxable = Boolean.Parse(s.taxable);
-                        productDisplay.inventoryMethod = s.inventoryMethod;
-                        productDisplay.quantity = double.Parse(s.quantity);
-                        productDisplay.orderTrigger = int.Parse(s.orderTrigger);
-                        productDisplay.recommendedOrder = int.Parse(s.recommendedOrder);
-                        productDisplay.lastSoldDate = s.lastSoldDate;
-                        productDisplay.supplier = s.supplier;
-                        productDisplay.liabilityItem = s.liabilityItem;
-                        productDisplay.LRT = s.LRT;
-
-                        display.Add(productDisplay);
-
-                    }
-
-                    List<Product> updated = new List<Product>();
-                    List<Product> newItems = new List<Product>();
-
-                    using (JBOContext ctx = new JBOContext())
-                    {
-                        var products = from p in context.Products select p.productCode;
-                        var update = from p in display where products.Contains(p.productCode) select p;
-                        var newItem = from p in display where !products.Contains(p.productCode) select p;
-                        foreach (var i in update)
-                        {
-                            updated.Add(i);
-                        }
-
-                        foreach (var i in newItem)
-                        {
-                            context.Products.Add(i);
-                            context.SaveChanges();
-                        }
-
-                    }
-
-                    using (JBOContext cont = new JBOContext())
-                    {
-                        foreach (Product i in updated)
-                        {
-                            Product prod = context.Products.Single(p => p.productCode == i.productCode);
-                            prod.productCode = i.productCode;
-                            prod.description = i.description;
-                            prod.department = i.department;
-                            prod.category = i.category;
-                            prod.upc = i.upc;
-                            prod.storeCode = i.storeCode;
-                            prod.unitPrice = i.unitPrice;
-                            prod.discountable = i.discountable;
-                            prod.taxable = i.taxable;
-                            prod.inventoryMethod = i.inventoryMethod;
-                            prod.quantity = i.quantity;
-                            prod.orderTrigger = i.orderTrigger;
-                            prod.recommendedOrder = i.recommendedOrder;
-                            prod.lastSoldDate = i.lastSoldDate;
-                            prod.supplier = i.supplier;
-                            prod.liabilityItem = i.liabilityItem;
-                            prod.LRT = i.LRT;
-                            try
-                            {
-                                context.SaveChanges();
-                            }
-                            catch (EntityException ex)
-                            {
-
-                            }
-                        }
-
-                    }
-                }
-            }
-            catch (DbEntityValidationException e)
-            {
-                foreach (var eve in e.EntityValidationErrors)
-                {
-                    Console.WriteLine("Entity of type \"{0}\" in state \"{1}\" has the following validation errors:",
-                        eve.Entry.Entity.GetType().Name, eve.Entry.State);
-                    foreach (var ve in eve.ValidationErrors)
-                    {
-                        Console.WriteLine("- Property: \"{0}\", Error: \"{1}\"",
-                            ve.PropertyName, ve.ErrorMessage);
-                    }
-                }
-                throw;
+                        success = true,
+                        productsHash = model.productsHash,
+                        salesHash = model.salesHash
+                    });
             }
 
-            return RedirectToAction("Products");
+            // See here for the ModelState errors incantation:
+            // http://stackoverflow.com/questions/1352948/how-to-get-all-errors-from-asp-net-mvc-modelstate#comment33109172_4934712
+            return Json(new
+            {
+                success = false,
+                errors = ModelState.Values.SelectMany(v => v.Errors.Select(b => b.ErrorMessage)),
+                productsHash = model.productsHash,
+                salesHash = model.salesHash
+            });
+
+
+            //List<Product> display = new List<Product>();
+
+            //try
+            //{
+            //    if (file != null && file.ContentLength > 0)
+            //    {
+            //        StreamReader files = new StreamReader(file.InputStream);
+            //        var csv = new CsvReader(files);
+            //        csv.Configuration.RegisterClassMap<ProductClassMap>();
+
+            //        var productList = csv.GetRecords<ProductView>().ToList();
+
+
+            //        foreach (var s in productList)
+            //        {
+            //            Product productDisplay = new Product();
+
+            //            productDisplay.productCode = int.Parse(s.productCode);
+            //            productDisplay.description = s.description;
+            //            productDisplay.department = s.department;
+            //            productDisplay.category = s.category;
+            //            productDisplay.upc = s.upc;
+            //            productDisplay.storeCode = s.storeCode;
+            //            productDisplay.unitPrice = decimal.Parse(s.unitPrice);
+            //            productDisplay.discountable = Boolean.Parse(s.discountable);
+            //            productDisplay.taxable = Boolean.Parse(s.taxable);
+            //            productDisplay.inventoryMethod = s.inventoryMethod;
+            //            productDisplay.quantity = double.Parse(s.quantity);
+            //            productDisplay.orderTrigger = int.Parse(s.orderTrigger);
+            //            productDisplay.recommendedOrder = int.Parse(s.recommendedOrder);
+            //            productDisplay.lastSoldDate = s.lastSoldDate;
+            //            productDisplay.supplier = s.supplier;
+            //            productDisplay.liabilityItem = s.liabilityItem;
+            //            productDisplay.LRT = s.LRT;
+
+            //            display.Add(productDisplay);
+
+            //        }
+
+            //        List<Product> updated = new List<Product>();
+            //        List<Product> newItems = new List<Product>();
+
+
+            //        var products = from p in context.Products select p.productCode;
+            //        var update = from p in display where products.Contains(p.productCode) select p;
+            //        var newItem = from p in display where !products.Contains(p.productCode) select p;
+            //        foreach (var i in update)
+            //        {
+            //            updated.Add(i);
+            //        }
+
+            //        foreach (var i in newItem)
+            //        {
+            //            context.Products.Add(i);
+            //            context.SaveChanges();
+            //        }
+
+
+
+            //        foreach (Product i in updated)
+            //        {
+            //            Product prod = context.Products.Single(p => p.productCode == i.productCode);
+            //            prod.productCode = i.productCode;
+            //            prod.description = i.description;
+            //            prod.department = i.department;
+            //            prod.category = i.category;
+            //            prod.upc = i.upc;
+            //            prod.storeCode = i.storeCode;
+            //            prod.unitPrice = i.unitPrice;
+            //            prod.discountable = i.discountable;
+            //            prod.taxable = i.taxable;
+            //            prod.inventoryMethod = i.inventoryMethod;
+            //            prod.quantity = i.quantity;
+            //            prod.orderTrigger = i.orderTrigger;
+            //            prod.recommendedOrder = i.recommendedOrder;
+            //            prod.lastSoldDate = i.lastSoldDate;
+            //            prod.supplier = i.supplier;
+            //            prod.liabilityItem = i.liabilityItem;
+            //            prod.LRT = i.LRT;
+            //            try
+            //            {
+            //                context.SaveChanges();
+            //            }
+            //            catch (EntityException ex)
+            //            {
+
+            //            }
+            //        }
+
+
+            //    }
+            //}
+            //catch (DbEntityValidationException e)
+            //{
+            //    foreach (var eve in e.EntityValidationErrors)
+            //    {
+            //        Console.WriteLine("Entity of type \"{0}\" in state \"{1}\" has the following validation errors:",
+            //            eve.Entry.Entity.GetType().Name, eve.Entry.State);
+            //        foreach (var ve in eve.ValidationErrors)
+            //        {
+            //            Console.WriteLine("- Property: \"{0}\", Error: \"{1}\"",
+            //                ve.PropertyName, ve.ErrorMessage);
+            //        }
+            //    }
+            //    throw;
+            //}
+
+            //return RedirectToAction("Products");
         }
 
         public ActionResult Sales()
