@@ -167,16 +167,34 @@
             } else {
                 // The csv seems legit.
                 // Check the modification time before hashing
-               
-                // Check the hash before parsing.
-                var file_is_unique = hash_file(file)
-                    .then(function (hash) {
-                        console.log(hash);
+                //
+                // The idiom below passes null as the errorFn for most of "then" statements.
+                // This allows returning a rejected promise to jump to the last failure handler
+                // which ultimately rejects the main promise. This way, hashing is only done if
+                // the file seems legitimate.
+                $.when(is_valid_dateFn(new Date(file.lastModifiedDate)))
+                .then(function (valid) {
+                    if (!valid) {
+                        // The file is older than the last import.
+                        errors.push("This file is out of date.");
+                        // Jump to the next failure handler.
+                        // This bypasses the hash check since it would be a waste of time.
+                        return $.Deferred().reject("Stale file detected.").promise();
+                    }
+                }, null)
+                .then(function () {
+                    // Check the hash before parsing.
+                    //
+                    // Nesting this "then" statement allows it to properly handle any problems
+                    // that come from hashing the file without preventing previous promises
+                    // from short-circuiting the process by returning a rejected promise.
+                    return hash_file(file).then(function (hash) {
                         // Return a new promise so this can be chained with other validations.
                         return $.Deferred(function (d) {
                             if (_.contains(import_metadata.hashes, hash)) {
                                 // The file is a duplicate
                                 errors.push("This file has already been imported.");
+                                // Jump to the next failure handler
                                 d.reject("Duplicate file")
                             } else {
                                 // The file is legit.
@@ -186,10 +204,11 @@
                     }, function (error) {
                         // Something happened reading the file.
                         // Let the server worry about the duplicate check.
+                        console.log(error);
                         return $.Deferred().resolve().promise();
-                    });
-
-                file_is_unique.then(function () {
+                    })
+                }, null)
+                .then(function () {
                     // All validations passed.
                     deferred.resolve();
                 }, function (name) {
@@ -213,7 +232,6 @@
                             handle_error(error.name, error.message);
                         },
                         complete: function (results, file) {
-                            console.log(results);
                             displayFn(results.data, file);
                             check_form();
                         }
