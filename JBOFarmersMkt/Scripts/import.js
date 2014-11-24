@@ -356,5 +356,20 @@
                 console.log(data);
             });
         });
+
+        // Display the last import times
+        var displayLastImportDate = function (preview_element, date) {
+            var d = new Date(date);
+            var time = d.toLocaleTimeString();
+            var day = d.toLocaleDateString();
+
+            $(preview_element)
+                        .siblings("h2")
+                        .first()
+                        .append(" <small>(Last imported at " + time + " on " + day + ")</small>");
+        }
+
+        displayLastImportDate("#products-preview", import_metadata.lastProductsImportDate);
+        displayLastImportDate("#sales-preview", import_metadata.lastSalesImportDate);
     });
 })(jQuery, _);
