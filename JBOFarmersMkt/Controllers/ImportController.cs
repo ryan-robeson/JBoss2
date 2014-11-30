@@ -82,8 +82,10 @@ namespace JBOFarmersMkt.Controllers
                 // Do import
                 //....
                 // Errors happened in the database...
-                p.dbErrors.Add("Database Error: Couldn't import products. Please try a different file.");
-                
+                //p.dbErrors.Add("Database Error: Couldn't import products. Please try a different file.");
+                Import.FromCSV(ImportCategories.Products, model.products.InputStream);
+                allImportsFailed = false;
+                p.success = true;
             }
 
             if (model.sales != null && ModelState.IsValidField("sales"))
@@ -106,8 +108,6 @@ namespace JBOFarmersMkt.Controllers
                     success = false,
                     errors = ModelState.Values.SelectMany(v => v.Errors.Select(b => b.ErrorMessage)),
                     details = new List<object> { p, s }
-                    // productsHash = model.productsHash, // May be useful for debugging
-                    // salesHash = model.salesHash // May be useful for debugging
                 });
             }
 
@@ -116,8 +116,6 @@ namespace JBOFarmersMkt.Controllers
             {
                 success = true,
                 details = new List<object> {p, s}
-                // productsHash = model.productsHash, // May be useful for debugging
-                // salesHash = model.salesHash // May be useful for debugging
             });
 
             //List<Product> display = new List<Product>();

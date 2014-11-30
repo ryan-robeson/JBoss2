@@ -5,6 +5,25 @@ using System.Web;
 
 namespace JBOFarmersMkt.ViewModels
 {
+    /// <summary>
+    /// Models a specific upload for error handling.
+    /// </summary>
+    /// <example> 
+    /// Failing products import
+    /// <code>
+    ///     ImportUploadStatusViewModel p = new ImportUploadStatusViewModel { name = "products" };
+    ///     p.success = false;
+    ///     p.dbErrors.Add("The database did not approve because...");
+    /// </code>
+    /// </example>
+    /// <example>
+    /// Successful sales import
+    /// <code>
+    ///     ImportUploadStatusViewModel s = new ImportUploadStatusViewModel { name = "sales" };
+    ///     s.success = true;
+    ///     s.message = "Successfully imported sales. 120,000 records updated. 12,000 records created.";
+    /// </code>
+    /// </example>
     public class ImportUploadStatusViewModel
     {
         public bool success { get; set; }
