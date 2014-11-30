@@ -14,61 +14,27 @@ namespace JBOFarmersMkt.ViewModels
     [CannotAllBeEmpty("products", "sales", ErrorMessage = "The products and sales files cannot both be empty.")]
     public class ImportViewModel
     {
-        private HttpPostedFileBase _products;
-        private HttpPostedFileBase _sales;
+        [ValidFile(@"stock_items.*\.csv$")]
+        public HttpPostedFileBase products { get; set; }
 
-        public string productsHash { get; set; }
-
-        [ValidName(@"stock_items.*\.csv$")]
-        [UniqueFile("productsHash")]
-        public HttpPostedFileBase products
-        {
-            get { return _products; }
-            set
-            {
-                _products = value;
-                // Compute and store the file's hash so it can be used for validation
-                if (_products != null)
-                {
-                    productsHash = StreamHasher.ComputeHash(_products.InputStream);
-                }
-            }
-        }
-
-        public string salesHash { get; set; }
-
-        [ValidName(@"sales_from_.+_to_.+\.csv$")]
-        [UniqueFile("salesHash")]
-        public HttpPostedFileBase sales
-        {
-            get
-            {
-                return _sales;
-            }
-            set
-            {
-                _sales = value;
-                // Compute and store the file's hash so it can be used for validation
-                if (_sales != null)
-                {
-                    salesHash = StreamHasher.ComputeHash(_sales.InputStream);
-                }
-            }
-        }
+        [ValidFile(@"sales_from_.+_to_.+\.csv$")]
+        public HttpPostedFileBase sales { get; set; }
 
         /// <summary>
-        /// ValidName requires that an HttpPostedFileBase has a file name matching the given regex.
+        /// ValidFile requires that an HttpPostedFileBase has a file name matching the given regex and
+        /// Ensures that the file is unique based on its hash.
         /// </summary>
-        private class ValidName : ValidationAttribute
+        private class ValidFile : ValidationAttribute
         {
             private readonly string _r;
 
             /// <summary>
-            /// ValidName requires that an HttpPostedFileBase has a file name matching the given regex.
+            /// ValidFile requires that an HttpPostedFileBase has a file name matching the given regex and
+            /// ensures that the file is unique based on its hash.
             /// </summary>
             /// <param name="r">The regex to compare the filename to.</param>
-            public ValidName(string r)
-                : base("Invalid filename: {0}")
+            public ValidFile(string r)
+                : base("Invalid file: {0}")
             {
                 _r = r;
             }
@@ -78,50 +44,32 @@ namespace JBOFarmersMkt.ViewModels
                 HttpPostedFileBase file = value as HttpPostedFileBase;
                 if (value != null)
                 {
+                    // Check the filename before doing the
+                    // expensive hash check
                     if (!Regex.IsMatch(file.FileName, _r))
                     {
-                        var errorMessage = FormatErrorMessage(validationContext.DisplayName);
+                        var errorMessage = FormatErrorMessage(validationContext.DisplayName +
+                            ". This name does is not consistent with ShopKeep's for this file.");
                         return new ValidationResult(errorMessage);
                     }
-                }
-                return ValidationResult.Success;
-            }
-        }
-
-        /// <summary>
-        /// Ensures that the file is unique based on the hash stored in the given
-        /// property name.
-        /// </summary>
-        private class UniqueFile : ValidationAttribute
-        {
-            private readonly string _computedHashProperty;
-
-            /// <summary>
-            /// Ensures that the file is unique based on the hash stored in the given
-            /// property name.
-            /// </summary>
-            /// <param name="computedHashProperty">The name of the property that stores the file's hash.</param>
-            public UniqueFile(string computedHashProperty)
-                : base("This {0} file has already been uploaded.")
-            {
-                _computedHashProperty = computedHashProperty;
-            }
-
-            protected override ValidationResult IsValid(object value, ValidationContext validationContext)
-            {
-                string h = validationContext
-                    .ObjectType
-                    .GetProperty(_computedHashProperty)
-                    .GetValue(validationContext.ObjectInstance) as string;
-
-                if (h != null)
-                {
-                    if (!Import.IsUniqueContentHash(h))
+                    else
                     {
-                        var errorMessage = FormatErrorMessage(validationContext.DisplayName);
-                        return new ValidationResult(errorMessage);
+                        // The name is valid. Now we check the hash.
+                        // Compute the hash.
+                        string hash = StreamHasher.ComputeHash(file.InputStream);
+
+                        // Check that the file is unique
+                        if (!Import.IsUniqueContentHash(hash))
+                        {
+                            // It isn't
+                            var errorMessage = FormatErrorMessage(validationContext.DisplayName +
+                                ". This file has already been uploaded.");
+                            return new ValidationResult(errorMessage);
+                        }
                     }
                 }
+
+                // The file checks out
                 return ValidationResult.Success;
             }
         }
