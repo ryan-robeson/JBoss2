@@ -68,28 +68,57 @@ namespace JBOFarmersMkt.Controllers
         }
 
         [HttpPost]
-        public ActionResult Products(ImportViewModel model)
+        public ActionResult Upload(ImportViewModel model)
         {
-            if (ModelState.IsValid)
+            bool allImportsFailed = true;
+
+            ImportUploadStatusViewModel p = new ImportUploadStatusViewModel { name = "products" };
+            ImportUploadStatusViewModel s = new ImportUploadStatusViewModel { name = "sales" };
+
+            // Process both fields separately so that if one fails, the user
+            // doesn't have to redo the successful one as well.
+            if (model.products != null && ModelState.IsValidField("products"))
             {
-                return Json(new
-                    {
-                        success = true,
-                        productsHash = model.productsHash,
-                        salesHash = model.salesHash
-                    });
+                // Do import
+                //....
+                // Errors happened in the database...
+                p.dbErrors.Add("Database Error: Couldn't import products. Please try a different file.");
+                
             }
 
-            // See here for the ModelState errors incantation:
-            // http://stackoverflow.com/questions/1352948/how-to-get-all-errors-from-asp-net-mvc-modelstate#comment33109172_4934712
+            if (model.sales != null && ModelState.IsValidField("sales"))
+            {
+                // Do import
+                //....
+                // All went well...
+                allImportsFailed = false;
+                s.success = true;
+                s.message = "Successfully imported sales. 120,000 records updated. 12,000 records created.";
+            }
+
+            if (allImportsFailed)
+            {
+                // The submission failed validation.
+                // See here for the ModelState errors incantation:
+                // http://stackoverflow.com/questions/1352948/how-to-get-all-errors-from-asp-net-mvc-modelstate#comment33109172_4934712
+                return Json(new
+                {
+                    success = false,
+                    errors = ModelState.Values.SelectMany(v => v.Errors.Select(b => b.ErrorMessage)),
+                    details = new List<object> { p, s }
+                    // productsHash = model.productsHash, // May be useful for debugging
+                    // salesHash = model.salesHash // May be useful for debugging
+                });
+            }
+
+            // At least one of the imports succeeded.
             return Json(new
             {
-                success = false,
-                errors = ModelState.Values.SelectMany(v => v.Errors.Select(b => b.ErrorMessage)),
-                productsHash = model.productsHash,
-                salesHash = model.salesHash
+                success = true,
+                details = new List<object> {p, s}
+                // productsHash = model.productsHash, // May be useful for debugging
+                // salesHash = model.salesHash // May be useful for debugging
             });
-
 
             //List<Product> display = new List<Product>();
 

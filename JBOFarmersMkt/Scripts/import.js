@@ -347,7 +347,7 @@
             var formData = new FormData(this);
 
             $.ajax({
-                url: '/Import/Products',
+                url: '/Import/Upload',
                 type: 'POST',
                 data: formData,
                 contentType: false,
