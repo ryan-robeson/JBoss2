@@ -74,129 +74,112 @@ namespace JBOFarmersMkt.Models
         /// Imports the given category from the given CSV stream.
         /// </summary>
         /// <param name="type">The type of import.</param>
-        /// <param name="csv">The csv stream.</param>
-        public static void FromCSV(ImportCategories type, Stream csv)
+        /// <param name="file">The csv file.</param>
+        /// <param name="contentHash">The hash of the csv content.</param>
+        public static Tuple<int,int> FromCSV(ImportCategories type, HttpPostedFileBase csv, string contentHash)
         {
             bool error = false;
-
-            switch (type)
-            {
-                case ImportCategories.Sales:
-                    SalesFromCSV(csv);
-                    break;
-                case ImportCategories.Products:
-                    ProductsFromCSV(csv);
-                    break;
-                default:
-                    error = true;
-                    break;
-            }
-
-            if (error)
-            {
-                throw new Exception("Invalid import type.");
-            }
-        }
-
-        private static void ProductsFromCSV(Stream csv)
-        {
-            List<Product> display = new List<Product>();
+            Tuple<int,int> results = null;
 
             using (var context = new JBOContext())
             {
-                if (csv != null && csv.Length > 0)
+                switch (type)
                 {
-                    //var csvReader = new CsvReader(new StreamReader(csv));
-                    //csvReader.Configuration.RegisterClassMap<ProductClassMap>();
+                    case ImportCategories.Sales:
+                        results = SalesFromCSV(csv.InputStream, context);
+                        break;
+                    case ImportCategories.Products:
+                        results = ProductsFromCSV(csv.InputStream, context);
+                        break;
+                    default:
+                        error = true;
+                        break;
+                }
 
-                    //var productList = csvReader.GetRecords<ProductView>().ToList();
+                if (error)
+                {
+                    // I'm pretty sure C# does this automatically, but just in case
+                    // until I can find out for sure...
+                    throw new InvalidEnumArgumentException("Invalid import type.");
+                }
+                else
+                {
+                    // Something should've been imported.
+                    context.Imports.Add(
+                        new Import
+                        {
+                            contentHash = contentHash,
+                            type = type,
+                            filename = csv.FileName
+                        });
 
+                    // All done. Let's save the changes.
+                    context.SaveChanges();
 
-                    //foreach (var s in productList)
-                    //{
-                    //    Product productDisplay = new Product();
-
-                    //    productDisplay.productCode = int.Parse(s.productCode);
-                    //    productDisplay.description = s.description;
-                    //    productDisplay.department = s.department;
-                    //    productDisplay.category = s.category;
-                    //    productDisplay.upc = s.upc;
-                    //    productDisplay.storeCode = s.storeCode;
-                    //    productDisplay.unitPrice = decimal.Parse(s.unitPrice);
-                    //    productDisplay.discountable = Boolean.Parse(s.discountable);
-                    //    productDisplay.taxable = Boolean.Parse(s.taxable);
-                    //    productDisplay.inventoryMethod = s.inventoryMethod;
-                    //    productDisplay.quantity = double.Parse(s.quantity);
-                    //    productDisplay.orderTrigger = int.Parse(s.orderTrigger);
-                    //    productDisplay.recommendedOrder = int.Parse(s.recommendedOrder);
-                    //    productDisplay.lastSoldDate = s.lastSoldDate;
-                    //    productDisplay.supplier = s.supplier;
-                    //    productDisplay.liabilityItem = s.liabilityItem;
-                    //    productDisplay.LRT = s.LRT;
-
-                    //    display.Add(productDisplay);
-
-                    //}
-
-                    //List<Product> updated = new List<Product>();
-                    //List<Product> newItems = new List<Product>();
-
-
-                    //var products = from p in context.Products select p.productCode;
-                    //var update = from p in display where products.Contains(p.productCode) select p;
-                    //var newItem = from p in display where !products.Contains(p.productCode) select p;
-                    //foreach (var i in update)
-                    //{
-                    //    updated.Add(i);
-                    //}
-
-                    //foreach (var i in newItem)
-                    //{
-                    //    context.Products.Add(i);
-                    //    context.SaveChanges();
-                    //}
-
-
-
-                    //foreach (Product i in updated)
-                    //{
-                    //    Product prod = context.Products.Single(p => p.productCode == i.productCode);
-                    //    prod.productCode = i.productCode;
-                    //    prod.description = i.description;
-                    //    prod.department = i.department;
-                    //    prod.category = i.category;
-                    //    prod.upc = i.upc;
-                    //    prod.storeCode = i.storeCode;
-                    //    prod.unitPrice = i.unitPrice;
-                    //    prod.discountable = i.discountable;
-                    //    prod.taxable = i.taxable;
-                    //    prod.inventoryMethod = i.inventoryMethod;
-                    //    prod.quantity = i.quantity;
-                    //    prod.orderTrigger = i.orderTrigger;
-                    //    prod.recommendedOrder = i.recommendedOrder;
-                    //    prod.lastSoldDate = i.lastSoldDate;
-                    //    prod.supplier = i.supplier;
-                    //    prod.liabilityItem = i.liabilityItem;
-                    //    prod.LRT = i.LRT;
-                    //    try
-                    //    {
-                    //        context.SaveChanges();
-                    //    }
-                    //    catch (EntityException ex)
-                    //    {
-
-                    //    }
-                    //}
-
-
+                    return results;
                 }
             }
-            
         }
 
-        private static void SalesFromCSV(Stream csv)
+        /// <summary>
+        /// Imports products from a csv stream into the given context.
+        /// The caller is responsible for calling SaveChanges().
+        /// </summary>
+        /// <param name="csv">The CSV stream</param>
+        /// <param name="context">The DB Context</param>
+        private static Tuple<int, int> ProductsFromCSV(Stream csv, JBOContext context)
         {
+            List<Product> allImportedProducts = new List<Product>();
 
+            if (csv != null && csv.Length > 0)
+            {
+                var csvReader = new CsvReader(new StreamReader(csv));
+                csvReader.Configuration.RegisterClassMap<ProductClassMap>();
+
+                allImportedProducts = csvReader.GetRecords<Product>().ToList();
+
+                List<Product> updated = new List<Product>();
+                List<Product> newItems = new List<Product>();
+
+                var products = from p in context.Products select p.productCode;
+                updated = (from p in allImportedProducts where products.Contains(p.productCode) select p).ToList();
+                newItems = (from p in allImportedProducts where !products.Contains(p.productCode) select p).ToList();
+
+                // Add the new items to the context so they will be saved
+                // shortly.
+                context.Products.AddRange(newItems);
+
+                foreach (Product i in updated)
+                {
+                    Product prod = context.Products.Single(p => p.productCode == i.productCode);
+                    prod.productCode = i.productCode;
+                    prod.description = i.description;
+                    prod.department = i.department;
+                    prod.category = i.category;
+                    prod.upc = i.upc;
+                    prod.storeCode = i.storeCode;
+                    prod.unitPrice = i.unitPrice;
+                    prod.discountable = i.discountable;
+                    prod.taxable = i.taxable;
+                    prod.inventoryMethod = i.inventoryMethod;
+                    prod.quantity = i.quantity;
+                    prod.orderTrigger = i.orderTrigger;
+                    prod.recommendedOrder = i.recommendedOrder;
+                    prod.lastSoldDate = i.lastSoldDate;
+                    prod.supplier = i.supplier;
+                    prod.liabilityItem = i.liabilityItem;
+                    prod.LRT = i.LRT;
+                }
+
+                return new Tuple<int, int> ( updated.Count, newItems.Count );
+            }
+
+            return new Tuple<int, int>(0, 0);
+        }
+
+        private static Tuple<int,int> SalesFromCSV(Stream csv, JBOContext context)
+        {
+            return new Tuple<int, int>(0, 0);
         }
     }
 }

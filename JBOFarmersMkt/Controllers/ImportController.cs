@@ -80,22 +80,40 @@ namespace JBOFarmersMkt.Controllers
             if (model.products != null && ModelState.IsValidField("products"))
             {
                 // Do import
-                //....
-                // Errors happened in the database...
-                //p.dbErrors.Add("Database Error: Couldn't import products. Please try a different file.");
-                Import.FromCSV(ImportCategories.Products, model.products.InputStream);
-                allImportsFailed = false;
-                p.success = true;
+                try
+                {
+                    var results = Import.FromCSV(ImportCategories.Products, model.products, model.productsHash);
+
+                    p.FormatSuccessMessage(results);
+                    p.success = true;
+
+                    allImportsFailed = false;
+                }
+                catch (EntityException)
+                {
+                    // Something happened with the database.
+                    // The best we can do is tell the user the import failed.
+                    // This should be logged as well if that ever gets implemented.
+                    p.dbErrors.Add("Database Error: Couldn't import products. Please try a different file.");
+                    //throw;
+                }
             }
 
             if (model.sales != null && ModelState.IsValidField("sales"))
             {
                 // Do import
-                //....
-                // All went well...
-                allImportsFailed = false;
-                s.success = true;
-                s.message = "Successfully imported sales. 120,000 records updated. 12,000 records created.";
+                try
+                {
+                    allImportsFailed = false;
+                    s.success = true;
+                    s.message = "Successfully imported sales. 120,000 records updated. 12,000 records created.";
+                }
+                catch (EntityException)
+                {
+                    // Same as above...
+                    s.dbErrors.Add("Database Error: Couldn't import sales. Please try a different file.");
+                    //throw;
+                }
             }
 
             if (allImportsFailed)
@@ -115,7 +133,7 @@ namespace JBOFarmersMkt.Controllers
             return Json(new
             {
                 success = true,
-                details = new List<object> {p, s}
+                details = new List<object> { p, s }
             });
 
             //List<Product> display = new List<Product>();

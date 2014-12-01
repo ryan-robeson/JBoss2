@@ -38,5 +38,15 @@ namespace JBOFarmersMkt.ViewModels
             success = false;
             dbErrors = new List<string>();
         }
+
+        /// <summary>
+        /// Sets up the success message.
+        /// </summary>
+        /// <param name="results">A Tuple containing the items updated and created.</param>
+        public void FormatSuccessMessage(Tuple<int, int> results) {
+            string format = "{0} Import complete. {1} items updated. {2} items created.";
+
+            message = String.Format(format, name, results.Item1, results.Item2);
+        }
     }
 }

@@ -14,10 +14,14 @@ namespace JBOFarmersMkt.ViewModels
     [CannotAllBeEmpty("products", "sales", ErrorMessage = "The products and sales files cannot both be empty.")]
     public class ImportViewModel
     {
-        [ValidFile(@"stock_items.*\.csv$")]
+        // Hashes are set if validation gets around to hashing.
+        public string productsHash { get; private set; }
+        public string salesHash { get; private set; }
+
+        [ValidFile(@"stock_items.*\.csv$", @"productsHash")]
         public HttpPostedFileBase products { get; set; }
 
-        [ValidFile(@"sales_from_.+_to_.+\.csv$")]
+        [ValidFile(@"sales_from_.+_to_.+\.csv$", @"salesHash")]
         public HttpPostedFileBase sales { get; set; }
 
         /// <summary>
@@ -27,6 +31,7 @@ namespace JBOFarmersMkt.ViewModels
         private class ValidFile : ValidationAttribute
         {
             private readonly string _r;
+            private readonly string _p;
 
             /// <summary>
             /// ValidFile requires that an HttpPostedFileBase has a file name matching the given regex and
@@ -37,6 +42,20 @@ namespace JBOFarmersMkt.ViewModels
                 : base("Invalid file: {0}")
             {
                 _r = r;
+            }
+
+            /// <summary>
+            /// ValidFile requires that an HttpPostedFileBase has a file name matching the given regex and
+            /// ensures that the file is unique based on its hash. Optionally stores the calculated hash in a
+            /// property on the model.
+            /// </summary>
+            /// <param name="r">The regex to compare the filename to.</param>
+            /// <param name="p">The name of the property that will hold the hash.</param>
+            public ValidFile(string r, string p)
+                : base("Invalid file: {0}")
+            {
+                _r = r;
+                _p = p;
             }
 
             protected override ValidationResult IsValid(object value, ValidationContext validationContext)
@@ -57,6 +76,13 @@ namespace JBOFarmersMkt.ViewModels
                         // The name is valid. Now we check the hash.
                         // Compute the hash.
                         string hash = StreamHasher.ComputeHash(file.InputStream);
+
+                        // Store the hash on the model if a property was given.
+                        if (_p != null)
+                        {
+                            var m = validationContext.ObjectInstance;
+                            m.GetType().GetProperty(_p).SetValue(m, hash);
+                        }
 
                         // Check that the file is unique
                         if (!Import.IsUniqueContentHash(hash))
