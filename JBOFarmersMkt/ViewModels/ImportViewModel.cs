@@ -21,7 +21,8 @@ namespace JBOFarmersMkt.ViewModels
         [ValidFile(@"stock_items.*\.csv$", @"productsHash")]
         public HttpPostedFileBase products { get; set; }
 
-        [ValidFile(@"sales_from_.+_to_.+\.csv$", @"salesHash")]
+        // What we are referring to as sales is sold items in ShopKeep
+        [ValidFile(@"sold_items_from_.+_to_.+\.csv$", @"salesHash")]
         public HttpPostedFileBase sales { get; set; }
 
         /// <summary>

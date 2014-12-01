@@ -88,7 +88,7 @@
     }
 
     var is_valid_product_filename = is_valid_filename(/stock_items.+csv$/);
-    var is_valid_sales_filename = is_valid_filename(/sales_from_.+_to_.+csv$/);
+    var is_valid_sales_filename = is_valid_filename(/sold_items_from_.+_to_.+csv$/);
 
     // Return the base64 encoded sha256 hash corresponding to string.
     // See: https://github.com/digitalbazaar/forge#sha256
@@ -303,7 +303,7 @@
                 "lengthChange": false,
                 "columnDefs": [
                     {
-                        "targets": [3, 5, 6, 7, 8, 10, 14, 16],
+                        "targets": [0, 2, 5, 6, 7, 8, 10, 11, 12, 13, 14],
                         "visible": false
                     },
                     {

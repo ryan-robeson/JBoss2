@@ -177,6 +177,12 @@ namespace JBOFarmersMkt.Models
             return new Tuple<int, int>(0, 0);
         }
 
+        /// <summary>
+        /// Imports sales from a csv stream into the given context.
+        /// The caller is responsible for calling SaveChanges().
+        /// </summary>
+        /// <param name="csv">The CSV stream</param>
+        /// <param name="context">The DB Context</param>
         private static Tuple<int,int> SalesFromCSV(Stream csv, JBOContext context)
         {
             return new Tuple<int, int>(0, 0);

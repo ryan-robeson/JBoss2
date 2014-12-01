@@ -137,12 +137,6 @@ namespace JBOFarmersMkt.Controllers
             });
         }
 
-        public ActionResult Sales()
-        {
-            return View(context.Imports
-                .ToList());
-        }
-
         [HttpPost]
         public ActionResult Sales(HttpPostedFileBase file)
         {
