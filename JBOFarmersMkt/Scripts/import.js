@@ -221,6 +221,16 @@
         }
 
         $(file_input).change(function () {
+            if (this.files[0] == null) {
+                // The user hit cancel and the input is empty again...
+
+                // This fixes a potential bad state in the form and it
+                // prevents a javascript error where file is not defined below.
+                // Reset it.
+                $(this).trigger("validate.reset");
+                // Nothing more to do.
+                return;
+            }
             validate().then(function () {
                 // This file has passed validation.
                 input_has_success(error_element);
@@ -313,8 +323,11 @@
                 ]
             });
 
-        $("#reset-products-input").click(function (e) { e.preventDefault(); reset_file_input("#products", reset_product_preview) });
-        $("#reset-sales-input").click(function (e) { e.preventDefault(); reset_file_input("#sales", reset_sales_preview) });
+        // Setup reset handlers
+        $("#products").on("validate.reset", function (e) { reset_file_input("#products", reset_product_preview); });
+        $("#sales").on("validate.reset", function (e) { reset_file_input("#sales", reset_sales_preview) });
+        $("#reset-products-input").click(function (e) { e.preventDefault(); $("#products").trigger("validate.reset"); });
+        $("#reset-sales-input").click(function (e) { e.preventDefault(); $("#sales").trigger("validate.reset"); });
 
         // Parse products file input on change
         parse_file_on_change(
