@@ -104,9 +104,12 @@ namespace JBOFarmersMkt.Controllers
                 // Do import
                 try
                 {
-                    allImportsFailed = false;
+                    var results = Import.FromCSV(ImportCategories.Sales, model.sales, model.salesHash);
+
+                    s.FormatSuccessMessage(results);
                     s.success = true;
-                    s.message = "Successfully imported sales. 120,000 records updated. 12,000 records created.";
+
+                    allImportsFailed = false;
                 }
                 catch (EntityException)
                 {
@@ -135,153 +138,6 @@ namespace JBOFarmersMkt.Controllers
                 success = true,
                 details = new List<object> { p, s }
             });
-        }
-
-        [HttpPost]
-        public ActionResult Sales(HttpPostedFileBase file)
-        {
-            string path = null;
-
-            List<Sale> display = new List<Sale>();
-            JBOContext context = new JBOContext();
-            try
-            {
-                if (file.ContentLength > 0)
-                {
-                    JBODatabase db = new JBODatabase();
-
-                    var fileName = Path.GetFileName(file.FileName);
-                    path = AppDomain.CurrentDomain.BaseDirectory + "upload\\" + fileName;
-                    file.SaveAs(path);
-
-                    //var checkFileName = context.Import.Where(i => i.filename == fileName);
-
-                    var check = (from i in context.Imports where i.filename == fileName select i.filename).Count();
-
-                    if (check == 0)
-                    {
-
-                        StreamReader files = new StreamReader(path);
-                        var csv = new CsvReader(files);
-                        csv.Configuration.RegisterClassMap<SalesClassMap>();
-
-                        var productList = csv.GetRecords<SaleView>().ToList();
-
-
-                        foreach (var s in productList)
-                        {
-                            Sale saleDisplay = new Sale();
-
-                            saleDisplay.transCode = int.Parse(s.transCode);
-                            saleDisplay.date = DateTime.Parse(s.date);
-                            saleDisplay.custId = int.Parse(s.custID);
-                            saleDisplay.description = s.description;
-                            saleDisplay.department = s.department;
-                            saleDisplay.category = s.category;
-                            saleDisplay.upc = s.upc;
-                            saleDisplay.storeCode = s.storeCode;
-                            saleDisplay.unitPrice = decimal.Parse(s.unitPrice);
-                            saleDisplay.quantity = double.Parse(s.quantity);
-                            saleDisplay.totalPrice = decimal.Parse(s.totalPrice);
-                            saleDisplay.discount = decimal.Parse(s.discount);
-                            saleDisplay.total = decimal.Parse(s.total);
-                            saleDisplay.cost = decimal.Parse(s.cost);
-                            saleDisplay.register = int.Parse(s.register);
-                            saleDisplay.supplier = s.supplier;
-
-                            display.Add(saleDisplay);
-
-                        }
-
-                        db.addImportedFile(fileName);
-                        List<Sale> updated = new List<Sale>();
-                        List<Sale> newItems = new List<Sale>();
-
-                        using (JBOContext ctx = new JBOContext())
-                        {
-                            var sales = from s in context.Sales select s.transCode;
-                            var update = from s in display where sales.Contains(s.transCode) select s;
-                            var newItem = from s in display where !sales.Contains(s.transCode) select s;
-                            foreach (var i in update)
-                            {
-                                updated.Add(i);
-                            }
-
-                            foreach (var i in newItem)
-                            {
-                                context.Sales.Add(i);
-                                context.SaveChanges();
-                            }
-
-                        }
-
-                        using (JBOContext cont = new JBOContext())
-                        {
-                            foreach (Sale i in updated)
-                            {
-                                Sale sale = context.Sales.Single(s => s.transCode == i.transCode);
-
-                                sale.transCode = i.transCode;
-                                sale.date = i.date;
-                                sale.custId = i.custId;
-                                sale.description = i.description;
-                                sale.department = i.department;
-                                sale.category = i.category;
-                                sale.upc = i.upc;
-                                sale.storeCode = i.storeCode;
-                                sale.unitPrice = i.unitPrice;
-                                sale.quantity = i.quantity;
-                                sale.totalPrice = i.totalPrice;
-                                sale.discount = i.discount;
-                                sale.total = i.total;
-                                sale.cost = i.cost;
-                                sale.register = i.register;
-                                sale.supplier = i.supplier;
-
-                                try
-                                {
-                                    context.SaveChanges();
-                                }
-                                catch (EntityException ex)
-                                {
-
-                                }
-                            }
-
-                        }
-                    }
-
-
-
-                }
-                else
-                {
-                    ViewBag.Error = TempData["error"] = "This File has already been imported!";
-                    ViewBag.Message = TempData["Message"] = "If you wish to re-upload this file, try deleting it first then retry.";
-                    return View();
-
-                }
-
-            }
-
-            catch (DbEntityValidationException e)
-            {
-                foreach (var eve in e.EntityValidationErrors)
-                {
-                    Console.WriteLine("Entity of type \"{0}\" in state \"{1}\" has the following validation errors:",
-                        eve.Entry.Entity.GetType().Name, eve.Entry.State);
-                    foreach (var ve in eve.ValidationErrors)
-                    {
-                        Console.WriteLine("- Property: \"{0}\", Error: \"{1}\"",
-                            ve.PropertyName, ve.ErrorMessage);
-                    }
-                }
-                throw;
-            }
-
-            return RedirectToAction("Sales");
-
-
         }
 
         //    public ActionResult importReturns(int? page)

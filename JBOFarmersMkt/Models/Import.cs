@@ -76,10 +76,10 @@ namespace JBOFarmersMkt.Models
         /// <param name="type">The type of import.</param>
         /// <param name="file">The csv file.</param>
         /// <param name="contentHash">The hash of the csv content.</param>
-        public static Tuple<int,int> FromCSV(ImportCategories type, HttpPostedFileBase csv, string contentHash)
+        public static Tuple<int, int> FromCSV(ImportCategories type, HttpPostedFileBase csv, string contentHash)
         {
             bool error = false;
-            Tuple<int,int> results = null;
+            Tuple<int, int> results = null;
 
             using (var context = new JBOContext())
             {
@@ -171,7 +171,7 @@ namespace JBOFarmersMkt.Models
                     prod.LRT = i.LRT;
                 }
 
-                return new Tuple<int, int> ( updated.Count, newItems.Count );
+                return new Tuple<int, int>(updated.Count, newItems.Count);
             }
 
             return new Tuple<int, int>(0, 0);
@@ -183,8 +183,38 @@ namespace JBOFarmersMkt.Models
         /// </summary>
         /// <param name="csv">The CSV stream</param>
         /// <param name="context">The DB Context</param>
-        private static Tuple<int,int> SalesFromCSV(Stream csv, JBOContext context)
+        private static Tuple<int, int> SalesFromCSV(Stream csv, JBOContext context)
         {
+            List<Sale> allImportedSales = new List<Sale>();
+
+            if (csv != null && csv.Length > 0)
+            {
+                var csvReader = new CsvReader(new StreamReader(csv));
+                csvReader.Configuration.RegisterClassMap<SalesClassMap>();
+
+                allImportedSales = csvReader.GetRecords<Sale>().ToList();
+
+                //List<Sale> updated = new List<Sale>();
+                List<Sale> newItems = new List<Sale>();
+
+                var salesCodes = context.Sales.Select(s => s.transCode);
+
+                // Don't update sales like we did in products.
+                // Transaction codes are unique to a transaction.
+                // A transaction could have 30 items sold.
+                // The system is currently not designed to distinguish which of these items
+                // it may need to update within a given transaction.
+                // It is also likely that ShopKeep does not allow changing this data, and we won't
+                // receive transactions that have been changed anyway.
+                //updated = (from s in allImportedSales where salesCodes.Contains(s.transCode) select s).ToList();
+                newItems = (from s in allImportedSales where !salesCodes.Contains(s.transCode) select s).ToList();
+
+                // Add the new items to the context so they will be saved
+                // shortly.
+                context.Sales.AddRange(newItems);
+
+                return new Tuple<int, int>(0, newItems.Count);
+            }
             return new Tuple<int, int>(0, 0);
         }
     }
