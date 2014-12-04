@@ -26,7 +26,15 @@
 
     var display_preview = function (preview_element, template, dt_config) {
         return function (data, f) {
-            $(preview_element).html(template({ rows: data, file: f })).find("table").dataTable(dt_config);
+            //$(preview_element).html(template({ rows: data, file: f })).find("table").dataTable(dt_config);
+            // Has the same effect as above but runs twice as fast.
+            // Appears to be due to the expensive effects of "get offsetWidth" when the original
+            // table full of data is visible. Hiding the table reduces the cost to around 10ms.
+            // There's probably still room for optimization on large tables.
+            var t = $(template({ rows: data, file: f })).hide();
+            $(preview_element).html(t);
+            $(t).find("table").dataTable(dt_config);
+            $(preview_element).show().children().show();
         };
     };
 
@@ -291,7 +299,7 @@
             return function () {
                 $("#product-preview table.dataTable").dataTable({ "bRetrieve": true }).fnDestroy();
                 reset();
-            }            
+            }
         }();
 
         var reset_sales_preview = function () {
