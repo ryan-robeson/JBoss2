@@ -175,7 +175,7 @@ namespace JBOFarmersMkt.Models
                     newItems = (from p in allImportedProducts where !products.Contains(p.productCode) select p).ToList();
                 }
 
-                using (profiler.Step("Add new products to context"))
+                using (profiler.Step("Inserting new products"))
                 {
                     // We are in a transaction so go ahead and insert the 
                     // new items with the BulkInsert extension.

@@ -130,23 +130,13 @@ namespace JBOFarmersMkt.Controllers
                 }
             }
 
-            if (allImportsFailed)
-            {
-                // The submission failed validation.
-                // See here for the ModelState errors incantation:
-                // http://stackoverflow.com/questions/1352948/how-to-get-all-errors-from-asp-net-mvc-modelstate#comment33109172_4934712
-                return Json(new
-                {
-                    success = false,
-                    errors = ModelState.Values.SelectMany(v => v.Errors.Select(b => b.ErrorMessage)),
-                    details = new List<object> { p, s }
-                });
-            }
-
-            // At least one of the imports succeeded.
+            // Respond. Success will be true if at least one import succeeded.
+            // The errors list should still be checked in case an error for the
+            // other import needs to be displayed.
             return Json(new
             {
-                success = true,
+                success = allImportsFailed ? false : true,
+                errors = ModelState.Values.SelectMany(v => v.Errors.Select(b => b.ErrorMessage)),
                 details = new List<object> { p, s }
             });
         }
