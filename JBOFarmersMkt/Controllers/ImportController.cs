@@ -11,6 +11,7 @@ using System.Data;
 using System.Data.Entity.Validation;
 using System.Data.Entity.Core;
 using JBOFarmersMkt.ViewModels;
+using StackExchange.Profiling;
 
 namespace JBOFarmersMkt.Controllers
 {
@@ -18,16 +19,14 @@ namespace JBOFarmersMkt.Controllers
     {
 
         JBOContext context = new JBOContext();
+        MiniProfiler profiler = MiniProfiler.Current;
 
         //
         // GET: /Import/
 
         public ActionResult Index()
         {
-            // Change this to return lastModifiedDate for product and sales
-            // to save a round trip from the client later
-            //return View(context.Imports
-            //    .ToList());
+
 
             // Get last 5 product hashes
             var productHashes = context.Imports
@@ -60,9 +59,21 @@ namespace JBOFarmersMkt.Controllers
                 .First();
 
             // Send this data to the view for client-side validations
-            ViewBag.hashes = productHashes.Concat(salesHashes).ToArray();
-            ViewBag.lastProductsImportDate = lastProductsImportDate.ToString("s");
-            ViewBag.lastSalesImportDate = lastSalesImportDate.ToString("s");
+            using (profiler.Step("Store validation data in ViewBag"))
+            {
+                using (profiler.Step("Put hashes in ViewBag"))
+                {
+                    ViewBag.hashes = productHashes.Concat(salesHashes).ToArray();
+                }
+                using (profiler.Step("Put last products import date in ViewBag"))
+                {
+                    ViewBag.lastProductsImportDate = lastProductsImportDate.ToString("s");
+                }
+                using (profiler.Step("Put last sales import date in ViewBag"))
+                {
+                    ViewBag.lastSalesImportDate = lastSalesImportDate.ToString("s");
+                }
+            }
 
             return View(new ImportViewModel());
         }
