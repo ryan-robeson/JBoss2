@@ -38,25 +38,31 @@
         };
     };
 
+    var allowSubmission = function (bool) {
+        /// <summary>Set whether the form can be submitted or not</summary>
+        $("form input[type='submit']").prop("disabled", !bool);
+        return bool;
+    };
+
     // Disable form submission if there are any errors
     // or if the form is empty.
     var check_form = function () {
         // Default to disabled
-        var disabled = true;
+        var enabled = false;
 
         // Check if both inputs are empty
         // See: http://stackoverflow.com/a/17044272
-        var isEmpty = $("input[type=file]").filter(function () { return !this.value }).length == 2;
+        var isEmpty = $("input[type=file]").filter(function () { return !this.value; }).length == 2;
 
         var hasErrors = $("form").has(".has-error").length > 0;
 
         if (isEmpty || hasErrors) {
-            disabled = true;
+            enabled = false;
         } else {
-            disabled = false;
+            enabled = true;
         }
 
-        $("form input[type='submit']").prop("disabled", disabled);
+        allowSubmission(enabled);
     };
 
     // Reset the given file input using the workaround found
@@ -92,8 +98,8 @@
             }
 
             return true;
-        }
-    }
+        };
+    };
 
     var is_valid_product_filename = is_valid_filename(/stock_items.+csv$/);
     var is_valid_sales_filename = is_valid_filename(/sold_items_from_.+_to_.+csv$/);
@@ -104,7 +110,7 @@
         var md = forge.md.sha256.create();
         md.update(string);
         return forge.util.encode64(md.digest().data);
-    }
+    };
 
     // Hashes the given file. Returns a promise that will contain the hash or an error.
     var hash_file = function (f) {
@@ -112,25 +118,25 @@
         var deferred = $.Deferred();
 
         reader.onload = function (e) {
-            var result = compute_hash(e.target.result)
+            var result = compute_hash(e.target.result);
             deferred.resolve(result);
-        }
+        };
 
         reader.onerror = function () {
             deferred.reject(this);
-        }
+        };
 
         // Setting to ASCII could be a source of problems, but it seems to be agreeing
         // with the server so far.
         reader.readAsText(f, "ASCII");
 
         return deferred.promise();
-    }
+    };
 
     // Calls hash_file with the file in file_input
     var hash_file_input = function (file_input) {
         return hash_file($(file_input)[0].files[0]);
-    }
+    };
 
     // Takes the last import date for the particular import
     // and returns a function that takes the files lastModifiedDate.
@@ -138,8 +144,8 @@
     var is_valid_date = function (lastImportDate) {
         return function (fileDate) {
             return fileDate > lastImportDate;
-        }
-    }
+        };
+    };
 
     var spin = function (opts, target, element) {
         /// <summary>
@@ -235,7 +241,7 @@
                                 // The file is a duplicate
                                 errors.push("This file has already been imported.");
                                 // Jump to the next failure handler
-                                d.reject("Duplicate file")
+                                d.reject("Duplicate file");
                             } else {
                                 // The file is legit.
                                 d.resolve();
@@ -244,9 +250,9 @@
                     }, function (error) {
                         // Something happened reading the file.
                         // Let the server worry about the duplicate check.
-                        console.log(error);
+                        // console.log(error);
                         return $.Deferred().resolve().promise();
-                    })
+                    });
                 }, null)
                 .then(function () {
                     // All validations passed.
@@ -258,9 +264,12 @@
             }
 
             return deferred.promise();
-        }
+        };
 
         $(file_input).change(function () {
+            /*jshint -W041*/
+            // The following check doesn't work correctly with ===
+            // Tell jshint to ignore it for the time being.
             if (this.files[0] == null) {
                 // The user hit cancel and the input is empty again...
 
@@ -271,6 +280,7 @@
                 // Nothing more to do.
                 return;
             }
+            /*jshint +W041*/
 
             // Start spinner.
             var stopSpinner = spin(null, $(file_input).closest(".form-group").find(".reset-link")[0], file_input);
@@ -347,7 +357,7 @@
             return function () {
                 $("#product-preview table.dataTable").dataTable({ "bRetrieve": true }).fnDestroy();
                 reset();
-            }
+            };
         }();
 
         var reset_sales_preview = function () {
@@ -359,12 +369,12 @@
             return function () {
                 $("#sales-preview table.dataTable").dataTable({ "bRetrieve": true }).fnDestroy();
                 reset();
-            }
+            };
         }();
 
         var import_metadata = $.parseJSON($("#import-metadata").text()) || {};
         var is_valid_product_date = is_valid_date(new Date(import_metadata.lastProductsImportDate));
-        var is_valid_sales_date = is_valid_date(new Date(import_metadata.lastSalesImportDate))
+        var is_valid_sales_date = is_valid_date(new Date(import_metadata.lastSalesImportDate));
 
         var display_products = display_preview("#product-preview", table_template,
             {
@@ -402,7 +412,7 @@
 
         // Setup reset handlers
         $("#products").on("validate.reset", function (e) { reset_file_input("#products", reset_product_preview); });
-        $("#sales").on("validate.reset", function (e) { reset_file_input("#sales", reset_sales_preview) });
+        $("#sales").on("validate.reset", function (e) { reset_file_input("#sales", reset_sales_preview); });
         $("#reset-products-input").click(function (e) { e.preventDefault(); $("#products").trigger("validate.reset"); });
         $("#reset-sales-input").click(function (e) { e.preventDefault(); $("#sales").trigger("validate.reset"); });
 
@@ -434,22 +444,88 @@
         $("form#import").submit(function (e) {
             e.preventDefault();
 
+            // Hide and clear the server sent error and success messages.
+            $("#errors").hide().empty();
+            $("#success").hide().empty();
+
+            // Prevent successive submissions
+            allowSubmission(false);
+
             var formData = new FormData(this);
 
-            $.ajax({
+            var submitting = $.ajax({
                 url: '/Import/Upload',
                 type: 'POST',
                 data: formData,
                 contentType: false,
                 processData: false
             }).done(function (data) {
-                console.log(data);
+                // success will be true if at least one of the imports
+                // succeeded.
+                var success = data.success;
+
+                // Even if success is true, the other file could have still had errors.
+                var errors = data.errors.length > 0;
+
+                var errorsList = $("<ul class='list-unstyled'></ul>");
+                var successList = $("<ul class='list-unstyled'></ul>");
+
+                $.each(data.errors, function (_, error) {
+                    errorsList.append("<li>" + error + "</li>");
+                });
+
+                $.each(data.details, function (_, obj) {
+                    // Check for database exceptions
+                    $.each(obj.dbErrors, function (_, error) {
+                        errorsList.append("<li>" + error + "</li>");
+                        // Make sure an error message is displayed.
+                        // It's possible that a DB Exception wouldn't
+                        // stop the other file from importing successfully
+                        // and there wouldn't be any errors in data.errors.
+                        errors = true;
+                    });
+
+                    if (obj.success) {
+                        successList.append("<li>" + obj.message + "</li>");
+
+                        // The upload was successful. Reset it so it won't cause
+                        // trouble if the user submits the two files sequentially
+                        // instead of together.
+                        $("#" + obj.name.toLowerCase()).trigger("validate.reset");
+                    }
+                });
+
+                if (errors) {
+                    $("#errors").append(errorsList).show('fast');
+                }
+
+                if (success) {
+                    $("#success").append(successList).show('fast');
+                }
+            });
+
+            // Start loading spinner
+            var stopSpinning = spin(null, $(this).find("input[type='submit']").parent().get(0), this);
+
+            submitting.always(function () {
+                // Stop the loading spinner at the end of the submission whether it fails or not.
+                stopSpinning();
             });
         });
 
         // Display the last import times
         var displayLastImportDate = function (preview_element, date) {
             var d = new Date(date);
+
+            if (isNaN(d.getTime()) || d.getFullYear() < 2000) {
+                // If we get an import date older than this software,
+                // it's probably the default and there's no sense displaying
+                // it. It just means This is the first import.
+                // We really shouldn't have imports older than 2014,
+                // but can't hurt to play it safe. Hopefully.
+                return;
+            }
+
             var time = d.toLocaleTimeString();
             var day = d.toLocaleDateString();
 
@@ -457,9 +533,9 @@
                         .siblings("h2")
                         .first()
                         .append(" <small>(Last imported at " + time + " on " + day + ")</small>");
-        }
+        };
 
-        displayLastImportDate("#products-preview", import_metadata.lastProductsImportDate);
+        displayLastImportDate("#product-preview", import_metadata.lastProductsImportDate);
         displayLastImportDate("#sales-preview", import_metadata.lastSalesImportDate);
     });
 })(jQuery, _);
