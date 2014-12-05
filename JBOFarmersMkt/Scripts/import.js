@@ -141,6 +141,24 @@
         }
     }
 
+    // Start a new spinner (Loading indicator)
+    // opts - The opts passed to Spinner
+    // target - The target element to place the spinner in
+    // element - The element that will listen for the spinner.stop event.
+    // Returns a function that will stop the spinner.
+    // $(element).trigger("spinner.stop") will also stop the spinner.
+    var spin = function (opts, target, element) {
+        var spinner = new Spinner(opts).spin(target);
+
+        $(element).one("spinner.stop", function (e) {
+            spinner.spin(false);
+        });
+
+        return function () {
+            $(element).trigger("spinner.stop");
+        };
+    };
+
     // Generic function for parsing the given file input when it changes. Takes care of adding the event handler, data validation, and error handling.
     var parse_file_on_change = function (file_input, error_element, error_template, resetFn, is_valid_filenameFn, is_valid_dateFn, displayFn, import_metadata) {
         var handle_error = function (name, reason) {
@@ -239,19 +257,38 @@
                 // Nothing more to do.
                 return;
             }
+
+            // Start spinner.
+            var stopSpinner = spin({
+                lines: 12,
+                length: 4,
+                width: 2,
+                radius: 4,
+                speed: 2,
+                trail: 55
+            },
+            $(file_input).closest(".form-group").find(".reset-link")[0],
+            file_input);
+
             validate().then(function () {
                 // This file has passed validation.
                 input_has_success(error_element);
+
+                // Use a promise to allow running functions
+                // when the parse completes.
+                var dfd = new $.Deferred();
 
                 $(file_input).parse({
                     config: {
                         error: function (error, file) {
                             //console.log("An error occurred with the chosen file: ", error);
                             handle_error(error.name, error.message);
+                            dfd.reject();
                         },
                         complete: function (results, file) {
                             displayFn(results.data, file);
                             check_form();
+                            dfd.resolve();
                         }
                     },
                     //#region Unused beforeFn
@@ -261,7 +298,7 @@
                     //    // should now be occurring in validate(), however.
                     //    var a = { action: "continue" };
                     //    var r = [];
-
+                    //    r.push("testing...");
                     //    // If there are any reasons to abort, we should be aborting...
                     //    if (r.length > 0) {
                     //        a = { action: "abort" };
@@ -277,11 +314,17 @@
                     error: function (error, file, input_element, reason) {
                         //console.log("Error: ", error, " - ", reason);
                         handle_error(error.name, reason);
+                        dfd.reject();
                     }
-                })
+                });
+
+                return dfd.promise();
             }, function (name, errors) {
                 //This file failed validation.
                 handle_error(name, errors);
+            }).always(function () {
+                // Stop the spinner. Processing is over.
+                stopSpinner();
             });
         });
     };
@@ -305,6 +348,7 @@
         var reset_sales_preview = function () {
             // Store the original text
             var reset = reset_text_to_default("#sales-preview");
+
             // Return a function that will destroy the DataTable (allows garbage collection)
             // and reset the text.
             return function () {
