@@ -362,6 +362,10 @@
     <Compile Include="Migrations\201411220148127_Change Import Model.Designer.cs">
       <DependentUpon>201411220148127_Change Import Model.cs</DependentUpon>
     </Compile>
+    <Compile Include="Migrations\201412052045067_TrackNewAndUpdatedCountOnImport.cs" />
+    <Compile Include="Migrations\201412052045067_TrackNewAndUpdatedCountOnImport.Designer.cs">
+      <DependentUpon>201412052045067_TrackNewAndUpdatedCountOnImport.cs</DependentUpon>
+    </Compile>
     <Compile Include="Migrations\Configuration.cs" />
     <Compile Include="Models\AccountModels.cs" />
     <Compile Include="Models\Cart.cs" />
@@ -649,6 +653,9 @@
     </EmbeddedResource>
     <EmbeddedResource Include="Migrations\201411220148127_Change Import Model.resx">
       <DependentUpon>201411220148127_Change Import Model.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Migrations\201412052045067_TrackNewAndUpdatedCountOnImport.resx">
+      <DependentUpon>201412052045067_TrackNewAndUpdatedCountOnImport.cs</DependentUpon>
     </EmbeddedResource>
   </ItemGroup>
   <PropertyGroup>

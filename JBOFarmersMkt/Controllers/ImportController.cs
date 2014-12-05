@@ -26,8 +26,6 @@ namespace JBOFarmersMkt.Controllers
 
         public ActionResult Index()
         {
-
-
             // Get last 5 product hashes
             var productHashes = context.Imports
                 .Where(i => i.type == ImportCategories.Products)
