@@ -141,14 +141,28 @@
         }
     }
 
-    // Start a new spinner (Loading indicator)
-    // opts - The opts passed to Spinner
-    // target - The target element to place the spinner in
-    // element - The element that will listen for the spinner.stop event.
-    // Returns a function that will stop the spinner.
-    // $(element).trigger("spinner.stop") will also stop the spinner.
     var spin = function (opts, target, element) {
-        var spinner = new Spinner(opts).spin(target);
+        /// <summary>
+        /// Start a new spinner (Loading indicator).
+        /// $(element).trigger("spinner.stop") will also stop the spinner.
+        /// </summary>
+        /// <param name="opts" type="Object">Keys take precedence over the defaults: { lines: 12, length: 4, width: 2, radius: 4, speed: 2, trail: 55 } </param>
+        /// <param name="target" type="Element">The target element to place the spinner in</param>
+        /// <param name="element" type="Element">The element that will listen for the spinner.stop event.</param>
+        /// <returns type="Function">A function that will stop the spinner.</returns>
+        var defaultOpts = {
+            lines: 12,
+            length: 4,
+            width: 2,
+            radius: 4,
+            speed: 2,
+            trail: 55
+        };
+
+        // Merge the default options with any passed to function.
+        var options = $.extend({}, defaultOpts, opts);
+
+        var spinner = new Spinner(options).spin(target);
 
         $(element).one("spinner.stop", function (e) {
             spinner.spin(false);
@@ -259,16 +273,7 @@
             }
 
             // Start spinner.
-            var stopSpinner = spin({
-                lines: 12,
-                length: 4,
-                width: 2,
-                radius: 4,
-                speed: 2,
-                trail: 55
-            },
-            $(file_input).closest(".form-group").find(".reset-link")[0],
-            file_input);
+            var stopSpinner = spin(null, $(file_input).closest(".form-group").find(".reset-link")[0], file_input);
 
             validate().then(function () {
                 // This file has passed validation.
